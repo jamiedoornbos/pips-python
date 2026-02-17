@@ -16,7 +16,7 @@ from pips.model import (
 
 
 class SolverCaches:
-    def add_node(self, parent: Node, placement: Placement) -> tuple[Node, bool]:
+    def add_node(self, parent: Node, placement: Placement) -> tuple[Node | BoardStatus, bool]:
         raise NotImplementedError()
 
     def get_constraint(self, loc: Location) -> Constraint | None:
@@ -38,7 +38,6 @@ class SolverDebug:
 class Node:
     def __init__(self, board: Board):
         self._board = board
-        self._children: list['Node'] = []
         self._status: BoardStatus | None = None
 
     @property
@@ -52,6 +51,10 @@ class Node:
     @property
     def solved(self) -> bool:
         return self._status == 'won'
+
+    @property
+    def status(self) -> BoardStatus | None:
+        return self._status
 
     def expand(self, solver: SolverCaches, debug: SolverDebug):
         # check that each constraint is potentially solvable
@@ -85,16 +88,17 @@ class Node:
                 return
 
         # spawn the children
+        child_count = 0
         for placement in to_place:
-            child_node, existed = solver.add_node(self, placement)
+            _child_node, existed = solver.add_node(self, placement)
             if existed:
                 debug.add_message(
                     self, f'Skipped placement {placement} since it resulted in a board that was already visited'
                 )
                 continue
-            self._children.append(child_node)
+            child_count += 1
 
-        debug.add_message(self, f'Found {len(to_place)} placements and added {len(self._children)} unique children')
+        debug.add_message(self, f'Found {len(to_place)} placements and added {child_count} unique children')
 
         # set closure status
         self._status = self._board.test_finished().status if len(remaining) == 0 else 'incomplete'
@@ -202,64 +206,3 @@ class Node:
                         return 'matching pips added'
 
         return None
-
-
-"""
-
-
-
-
-import _ from 'lodash';
-
-import Board, { BoardStatus } from './board';
-import { Combinations } from './combinations';
-import Constraint from './constraint';
-import { PipCount } from './domino';
-import DominoPlacement from './domino-placement';
-import Solver from './solver';
-import { Tile } from './tile';
-import { VECTORS } from './vectors';
-
-export default class SolverNode {
-  _board: Board;
-  _children: SolverNode[] = [];
-  _messages: string[] = [];
-  _status: BoardStatus | null = null;
-
-  constructor(board: Board) {
-    this._board = board;
-  }
-
-  get board() {
-    return this._board;
-  }
-
-  get children() {
-    return this._children;
-  }
-
-  get messages(): readonly string[] {
-    return this._messages;
-  }
-
-  get lastPlacement() {
-    const placements = this._board.placements;
-    return placements[placements.length - 1] || null;
-  }
-
-  get open(): boolean {
-    return !this._status;
-  }
-
-  get status() {
-    return this._status;
-  }
-
-  get solved(): boolean {
-    return this._status === 'won';
-  }
-
-
-}
-
-"""

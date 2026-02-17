@@ -2,7 +2,14 @@ import enum
 import typing
 from dataclasses import dataclass
 
+from .domino import PipCount
+from .location import Location
 from .locationset import LocationSet
+
+
+class BoardState:
+    def get_pips(self, location: Location) -> PipCount | None:
+        raise NotImplementedError()
 
 
 @dataclass
@@ -34,3 +41,30 @@ class Constraint(typing.NamedTuple):
     tiles: LocationSet
     type: ConstraintType
     value: int | None
+
+    def is_satisfied(self, board: BoardState) -> bool:
+        values = []
+        for location in self.tiles:
+            pips = board.get_pips(location)
+            if pips is None:
+                return False
+            values.append(pips)
+
+        if self.type.is_sum:
+            test_sum = sum(values)
+            match self.type:
+                case ConstraintType.EQUAL:
+                    return test_sum == self.value
+                case ConstraintType.GREATER:
+                    return test_sum > self.value
+                case ConstraintType.LESS:
+                    return test_sum < self.value
+        else:
+            unique = set(values)
+            match self.type:
+                case ConstraintType.MATCH:
+                    return len(unique) == 1
+                case ConstraintType.NOT_MATCH:
+                    return len(unique) == len(values)
+
+        raise ValueError(f'Abnormal constrtaint state {self}')

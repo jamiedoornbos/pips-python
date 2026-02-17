@@ -1,6 +1,6 @@
 import typing
 
-from pips.model import Board, Constraint, Location, LocationSet, Orientation, Placement
+from pips.model import Board, BoardStatus, Constraint, Location, LocationSet, Orientation, Placement
 
 from .node import Node, SolverCaches, SolverDebug
 
@@ -29,7 +29,7 @@ def _board_state_key(placements: list[Placement]):
 
 
 class Solver(SolverCaches, SolverDebug):
-    _nodes: dict[tuple[Placement, ...], Node]
+    _nodes: dict[tuple[Placement, ...], Node | BoardStatus]
     _open: list[list[Node]]
     _constraint_map: dict[Location, Constraint]
     _valid_placements: dict[tuple[_Placement, ...], tuple[_Placement, ...]]
@@ -82,6 +82,9 @@ class Solver(SolverCaches, SolverDebug):
         if node.solved:
             self._solutions.append(node)
 
+        # free memory
+        self._nodes[_board_state_key(node._board.placements)] = node.status
+
         return node
 
     def add_node(self, parent, placement):
@@ -98,39 +101,3 @@ class Solver(SolverCaches, SolverDebug):
         self._open[tier].append(child := Node(board))
         self._nodes[state_key] = child
         return child, False
-
-
-"""
-
-
-
-export default class Solver {
-
-  get numOpenNodes(): number {
-    return this._numOpenNodes;
-  }
-
-  get depthOpens(): Record<number, number> {
-    return _.fromPairs(_.map(this._open, (tier, index) => [index, tier.length]));
-  }
-
-  get solutions(): readonly SolverNode[] {
-    return this._solutions;
-  }
-
-  get root(): SolverNode {
-    return this._nodes[''];
-  }
-
-  buildStack(node: SolverNode): SolverNode[] {
-    const placements = node.board.placements;
-    if (placements.length === 0) {
-      return [node];
-    }
-    const parent = this._nodes[boardStateKey(placements.slice(0, placements.length - 1))];
-    const stack = this.buildStack(parent);
-    stack.push(node);
-    return stack;
-  }
-}
-"""

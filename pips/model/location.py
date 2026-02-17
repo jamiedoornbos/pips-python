@@ -12,3 +12,6 @@ class Location(typing.NamedTuple):
 
     def __sub__(self, rhs: Vector):
         return Location(self.x - rhs.dx, self.y - rhs.dy)
+
+    def __repr__(self):
+        return f'({self.x}, {self.y})'
