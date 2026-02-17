@@ -11,10 +11,10 @@ class _Orientation:
 
 
 class Orientation(enum.Enum):
-    NORTH = _Orientation("north", Vector(0, -1))
-    EAST = _Orientation("east", Vector(1, 0))
-    SOUTH = _Orientation("south", Vector(0, 1))
-    WEST = _Orientation("west", Vector(-1, 0))
+    NORTH = _Orientation('north', Vector(0, -1))
+    EAST = _Orientation('east', Vector(1, 0))
+    SOUTH = _Orientation('south', Vector(0, 1))
+    WEST = _Orientation('west', Vector(-1, 0))
 
     @property
     def offset(self):

@@ -1,6 +1,27 @@
+from pips.data.boardfromstr import read_board_from_string
 from pips.model import Board, Constraint, ConstraintType, Domino, Location, LocationSet, Orientation
 
 from .solver import Solver
+
+
+def _board():
+    return read_board_from_string("""
+        # Background
+            AABB
+            @CCD
+            ECCD
+            E@FF
+        # Constraints
+            A: eq 4
+            B: match
+            C: eq 1
+            D: match
+            E: match
+            F: match
+        # Dominoes
+            06 22 01 43
+            25 42 50 12
+    """)
 
 
 def test_valid_placements():
@@ -19,3 +40,8 @@ def test_valid_placements():
     check(1, 1, 0, Orientation.WEST)
     check(2, 2, 0, Orientation.EAST)
     check(3, 3, 0, Orientation.WEST)
+
+
+def test_expand_next():
+    solver = Solver(_board())
+    node = solver.expand_next()

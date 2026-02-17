@@ -1,6 +1,7 @@
 import typing
 
 PipCount = typing.Literal[0, 1, 2, 3, 4, 5, 6]
+MAX_PIPS: PipCount = 6
 
 
 class Domino(typing.NamedTuple):
@@ -13,7 +14,7 @@ class Domino(typing.NamedTuple):
         yield self.right_pips
 
     def __str__(self):
-        return f"{self.left_pips}{self.right_pips}"
+        return f'{self.left_pips}{self.right_pips}'
 
     def __repr__(self):
-        return f"{self.left_pips}{self.right_pips}"
+        return f'{self.left_pips}{self.right_pips}'

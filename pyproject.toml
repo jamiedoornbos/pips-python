@@ -16,8 +16,7 @@ dev = [
 
 [tool.ruff]
 line-length = 120
-
+format.quote-style = "single"
 
 [tool.ruff.lint]
 select = ["I"]
-
