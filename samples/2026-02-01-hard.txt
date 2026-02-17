@@ -1,0 +1,25 @@
+
+      # Title
+        2026-02-01-hard
+      # Background
+        ...AABB
+        ..@CAB.
+        DDEF...
+        GEEF...
+        ..E@HI.
+        ...@III
+      # Constraints
+        A: lt 4
+        B: lt 9
+        C: lt 3
+        D: eq 12
+        E: lt 20
+        F: lt 7
+        G: lt 5
+        H: lt 3
+        I: eq 6
+      # Dominoes
+        11 44 10 62
+        00 52 61 43
+        66 45 55 63
+    

@@ -1,0 +1,19 @@
+
+      # Title
+        2026-02-01-medium
+      # Background
+        .AB
+        CCD
+        E.F
+        GGF
+      # Constraints
+        A: eq 0
+        B: gt 4
+        C: match
+        D: eq 6
+        E: eq 6
+        F: match
+        G: match
+      # Dominoes
+        05 33 60 64 04
+    

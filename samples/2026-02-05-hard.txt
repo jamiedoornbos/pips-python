@@ -1,0 +1,22 @@
+
+      # Title
+        2026-02-05-hard
+      # Background
+        ..@..
+        A.B.C
+        D.B.C
+        D@EFC
+        ..E..
+        ..G..
+      # Constraints
+        A: gt 2
+        B: eq 7
+        C: eq 7
+        D: eq 7
+        E: eq 7
+        F: gt 1
+        G: gt 0
+
+      # Dominoes
+        01 40 43 14 63 21 51  
+    

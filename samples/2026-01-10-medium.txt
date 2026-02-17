@@ -1,0 +1,21 @@
+
+      # Title
+        2026-01-10-medium
+      # Background
+        @@..AA
+        ......
+        ..BB..
+        @....C
+        D....C
+        DEEFFC
+      # Constraints
+        A: eq 7
+        B: gt 2
+        C: match 
+        D: gt 9
+        E: eq 4
+        F: eq 5
+      # Dominoes
+        12 43 15 60
+        11 20 61 00
+    

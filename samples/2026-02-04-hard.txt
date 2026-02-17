@@ -1,0 +1,28 @@
+
+      # Title
+        2026-02-04-hard
+      # Background
+        AABCDE
+        .ABCD.
+        ..FF..
+        ..GH..
+        .IGHJ.
+        KIIHHL
+      # Constraints
+        A: match
+        B: match
+        C: match
+        D: match
+        E: eq 0
+        F: match
+        G: match
+        H: match
+        I: eq 2
+        J: gt 3
+        K: gt 2
+        L: eq 1
+      # Dominoes
+        65 14 32 15
+        60 45 20 46
+        55 42 16 40
+    

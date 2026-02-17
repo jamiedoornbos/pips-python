@@ -1,0 +1,25 @@
+
+      # Title
+        2026-01-12-hard
+      # Background
+        ..AABB
+        ..CDD@
+        ..C@..
+        ..CH..
+        EECH..
+        FFFG..
+        ..FG..
+        ..@@..
+      # Constraints
+        A: eq 4
+        B: eq 12
+        C: match
+        D: eq 10
+        E: eq 10
+        F: eq 2
+        G: eq 4
+        H: eq 12
+      # Dominoes
+        23 25 65 64 34 36 50 53 11 62 02 44
+
+    

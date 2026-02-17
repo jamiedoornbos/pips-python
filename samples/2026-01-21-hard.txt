@@ -1,0 +1,31 @@
+
+      # Title
+        2026-01-21-hard
+      # Background
+        ..ABC...
+        ..A.C...
+        ..ADD...
+        ........
+        E.F.G.H.
+        EIIJJ.K.
+        .L.M..KN
+      # Constraints
+        A: match
+        B: eq 4
+        C: match
+        D: eq 5
+        E: eq 3
+        F: lt 2
+        G: gt 4
+        H: gt 0
+        I: eq 4
+        J: match
+        K: match
+        L: gt 4
+        M: eq 0
+        N: gt 4
+      # Dominoes
+        00 42 04 21
+        03 35 01 50 65 
+        14 46
+    

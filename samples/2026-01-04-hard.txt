@@ -1,0 +1,22 @@
+
+      # Title
+        2026-01-04-hard
+      # Background
+        A..B.CC@
+        A..@.D.E
+        A..@.FEE
+        G..@.F..
+        GHHI.F..
+      # Constraints
+        A: eq 11
+        B: lt 1
+        C: eq 11
+        D: gt 1
+        E: match
+        F: eq 11
+        G: eq 1
+        H: eq 11
+        I: eq 1
+      # Dominoes
+        11 52 10 33 06 44 51 55 31 22 16
+    

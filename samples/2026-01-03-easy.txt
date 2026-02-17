@@ -1,0 +1,16 @@
+
+      # Title
+        2026-01-03-easy
+      # Background
+        ABB@
+        .CC.
+        @DDE
+      # Constraints
+        A: lt 1
+        B: match
+        C: match
+        D: match
+        E: gt 2
+      # Dominoes
+        61 34 55 60 24
+    

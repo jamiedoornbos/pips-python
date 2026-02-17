@@ -1,0 +1,19 @@
+
+      # Title
+        2026-02-10-medium
+      # Background
+        AABB
+        @CCD
+        ECCD
+        E@FF
+      # Constraints
+        A: eq 4
+        B: match
+        C: eq 1
+        D: match
+        E: match
+        F: match
+      # Dominoes
+        06 22 01 43
+        25 42 50 12
+    

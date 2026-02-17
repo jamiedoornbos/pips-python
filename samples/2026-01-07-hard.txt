@@ -1,0 +1,29 @@
+
+      # Title
+        2026-01-07-hard
+      # Background
+        AAB.C..@.
+        D.B.E..F.
+        DGH.E..F.
+        I.H.J..K.
+        I.L.JM.KN
+      # Constraints 
+        A: eq 6
+        B: eq 9
+        C: eq 3
+        D: eq 0
+        E: match
+        F: notMatch
+        G: gt 1
+        H: eq 1
+        I: lt 7
+        J: gt 8
+        K: eq 5
+        L: eq 4
+        M: gt 5
+        N: eq 2
+      # Dominoes
+        26 35 24 65
+        23 04 12 34
+        05 41 00 20
+    

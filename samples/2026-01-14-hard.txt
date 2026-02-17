@@ -1,0 +1,30 @@
+
+      # Title
+        2026-01-14-hard
+      # Background
+        AAABC
+        DD.B@
+        EE.FG
+        H@IIG
+        HJ.IK
+        LJ.MM
+        LL.NO
+      # Constraints
+        A: eq 12
+        B: notMatch
+        C: eq 2
+        D: match
+        E: eq 12
+        F: gt 2
+        G: eq 12
+        H: eq 0
+        I: eq 15
+        J: eq 2
+        K: eq 1
+        L: match
+        M: match
+        N: gt 3
+        O: lt 3
+      # Dominoes
+        41 44 10 20 16 60 25 35 66 03 11 51 34 31 33
+    

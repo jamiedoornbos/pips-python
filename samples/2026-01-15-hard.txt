@@ -1,0 +1,29 @@
+
+      # Title
+        2026-01-15-hard
+      # Background
+        .A.
+        BCC
+        DDC
+        .E.
+        .E.
+        .F.
+        .F.
+        GHI
+        GJJ
+        .K.
+      # Constraints
+        A: gt 3
+        B: gt 1
+        C: match
+        D: match
+        E: notMatch
+        F: notMatch
+        G: match
+        H: eq 5
+        I: gt 0
+        J: match
+        K: gt 3
+      # Dominoes
+        03 66 02 41 35 11 25 13 21
+    

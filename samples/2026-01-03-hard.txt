@@ -1,0 +1,21 @@
+
+      # Title
+        2026-01-03-hard
+      # Background
+        ...A..
+        .@BBCD
+        EF.DDD
+        .FFGGH
+      # Constraints
+        A: eq 1
+        B: eq 6
+        C: eq 6
+        D: match
+        E: eq 1
+        F: eq 10
+        G: match
+        H: lt 4
+      # Dominoes
+        04 66 12 16
+        00 06 03 44
+    

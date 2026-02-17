@@ -1,0 +1,24 @@
+
+      # Title
+        2026-01-23-hard
+      # Background
+        @@....AA
+        .@B..@A.
+        ..BBCC..
+        ...DE...
+        ...DE...
+        ...FG...
+        ...FG...
+      # Constraints
+        A: eq 7
+        B: eq 5
+        C: eq 7
+        D: eq 6
+        E: eq 10
+        F: eq 9
+        G: eq 3
+      # Dominoes
+       22 05 33 00
+       11 23 61 55
+       10 25
+    

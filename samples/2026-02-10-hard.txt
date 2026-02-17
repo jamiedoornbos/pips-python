@@ -1,0 +1,31 @@
+
+      # Title
+        2026-02-10-hard
+      # Background
+        ...AA..
+        ..BCCD.
+        .EB..DF
+        GE.....
+        HH.....
+        .HI..JJ
+        ..IKKJ.
+        ...LM..
+      # Constraints
+        A: match
+        B: eq 6
+        C: eq 11
+        D: eq 6
+        E: eq 4
+        F: gt 2
+        G: eq 0
+        H: match
+        I: eq 12
+        J: match
+        K: match
+        L: lt 4
+        M: gt 4
+      # Dominoes
+        12 16 32 53
+        01 55 66 03
+        60 36 50 22
+    

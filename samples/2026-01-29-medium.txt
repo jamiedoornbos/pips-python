@@ -1,0 +1,18 @@
+
+      # Title
+        2026-01-29-medium
+      # Background
+        A.BBC
+        A.@.C
+        D.EFF
+        DDE..
+      # Constraints
+        A: eq 8
+        B: eq 8
+        C: eq 8
+        D: eq 8
+        E: eq 8
+        F: match
+      # Dominoes
+        26 61 14 40 02 63 54
+    

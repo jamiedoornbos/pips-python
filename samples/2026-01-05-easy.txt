@@ -1,0 +1,17 @@
+
+      # Title
+        2026-01-05-easy
+      # Background
+        AB..
+        ABCC
+        @..D
+        ..E@
+      # Constraints
+        A: eq 7
+        B: match
+        C: match
+        D: gt 4
+        E: eq 4
+      # Dominoes
+        35 23 03 41 24
+    

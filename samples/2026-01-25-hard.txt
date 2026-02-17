@@ -1,0 +1,20 @@
+
+      # Title
+        2026-01-25-hard
+      # Background
+        AAAABB
+        @CCA@B
+        .....
+        DDDDEE
+        @FFFEE
+      # Constraints
+        A: match
+        B: match
+        C: match
+        D: match
+        E: match
+        F: match
+      # Dominoes
+        53 55 22 56 54 66
+        34 33 11 30 10 00
+    

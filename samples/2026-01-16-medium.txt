@@ -1,0 +1,18 @@
+
+      # Title
+        2026-01-16-medium
+      # Background
+        ..@..
+        @AAA@
+        ..A..
+        BBCC@
+        ..C..
+        ..D..
+      # Constraints
+        A: notMatch
+        B: lt 11
+        C: eq 7
+        D: gt 4
+      # Dominoes
+        65 66 46 33 55 24 26
+    

@@ -1,0 +1,28 @@
+
+      # Title
+        2026-01-27-hard
+      # Background
+        AA@B...
+        .A@BC..
+        ...DEFG
+        ...DHGG
+        .IJJK..
+        LL@J...
+      # Constraints
+        A: gt 5
+        B: gt 9
+        C: gt 1
+        D: gt 8
+        E: gt 0
+        F: gt 0
+        G: gt 0
+        H: gt 1
+        I: gt 0
+        J: gt 15
+        K: gt 0
+        L: gt 9
+      # Dominoes
+        41 50 31 22
+        06 15 33 24
+        65 12 46 20
+    

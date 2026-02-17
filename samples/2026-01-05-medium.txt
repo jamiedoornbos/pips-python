@@ -1,0 +1,18 @@
+
+      # Title
+        2026-01-05-medium
+      # Background
+        A....@
+        @@BBCC
+        .DDEE.
+        ..FE..
+      # Constraints
+        A: lt 6
+        B: match
+        C: eq 9
+        D: lt 2
+        E: match
+        F: gt 3
+      # Dominoes
+        50 26 45 36 65 03 53
+    

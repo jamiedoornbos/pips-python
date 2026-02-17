@@ -1,0 +1,19 @@
+
+      # Title
+        2026-01-10-easy
+      # Background 
+        ABCC
+        ...C
+        .D@E
+        FGGE
+      # Constraints 
+        A: eq 6
+        B: gt 1
+        C: match 
+        D: eq 1
+        E: eq 9
+        F: eq 3
+        G: match
+      # Dominoes 
+        16 30 62 40 11 51
+    

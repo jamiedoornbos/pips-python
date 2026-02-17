@@ -1,0 +1,15 @@
+
+      # Title
+        2026-01-14-easy
+      # Background
+        ...A
+        BCCA
+        B@D.
+      # Constraints
+        A: match
+        B: eq 10
+        C: match
+        D: eq 0
+      # Dominoes
+        44 55 06 40
+    
