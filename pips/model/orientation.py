@@ -19,3 +19,6 @@ class Orientation(enum.Enum):
     @property
     def offset(self):
         return self.value.offset
+
+    def __str__(self):
+        return self.value.name

@@ -4,7 +4,7 @@ from .constraint import BoardState, Constraint
 from .domino import Domino, PipCount
 from .locationset import Location, LocationSet
 from .orientation import Orientation
-from .placement import Placement
+from .placement import Placement, Position
 
 BoardStatus = typing.Literal['won', 'lost', 'incomplete']
 
@@ -50,8 +50,8 @@ class Board(BoardState):
     def get_pips(self, location: Location) -> PipCount | None:
         return self._board_state.get(location)
 
-    def place(self, domino: Domino, location: Location, orientation: Orientation):
-        placement = Placement(domino, location, orientation)
+    def place(self, placement: Placement):
+        domino, (location, orientation) = placement
 
         # check domino belongs to set
         if domino not in self._remaining_dominoes:

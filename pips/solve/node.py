@@ -12,6 +12,7 @@ from pips.model import (
     Orientation,
     PipCount,
     Placement,
+    Position,
 )
 
 
@@ -22,11 +23,7 @@ class SolverCaches:
     def get_constraint(self, loc: Location) -> Constraint | None:
         raise NotImplementedError()
 
-    class Placement:
-        loc: Location
-        dir: Orientation
-
-    def get_valid_placements(self, board: Board) -> list[Placement]:
+    def get_valid_positions(self, board: Board) -> list[Position]:
         raise NotImplementedError()
 
 
@@ -71,12 +68,12 @@ class Node:
                 return
 
         # find the valid location and orientation pairs
-        valid_placements = solver.get_valid_placements(self._board)
+        valid_positions = solver.get_valid_positions(self._board)
         to_place: list[Placement] = []
         for domino in remaining:
             valid_count = 0
-            for naked_placement in valid_placements:
-                test_placement = Placement(domino, naked_placement.loc, naked_placement.dir)
+            for position in valid_positions:
+                test_placement = Placement(domino, position)
                 if rejection := self._expand_at(solver, test_placement):
                     debug.add_message(self, rejection)
                     continue
@@ -146,7 +143,7 @@ class Node:
         constraint: Constraint | None
 
     def _expand_at(self, solver: SolverCaches, placement: Placement):
-        loc, domino, dir = placement.location, placement.domino, placement.orientation
+        domino, (loc, dir) = placement
         slots = tuple(
             Node._Slot(loc, pips, solver.get_constraint(loc))
             for loc, pips in ((loc, domino.left_pips), (loc + dir.offset, domino.right_pips))

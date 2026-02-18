@@ -24,12 +24,12 @@ def _board():
     """)
 
 
-def test_valid_placements():
+def test_valid_positions():
     background = LocationSet([Location(x, 0) for x in range(4)])
     constraint = Constraint(LocationSet([Location(x, 0) for x in (1, 2)]), ConstraintType.MATCH, None)
     board = Board(background, (constraint,), (Domino(0, 0), Domino(0, 1)))
     solver = Solver(board)
-    valid = sorted(solver.get_valid_placements(board))
+    valid = sorted(solver.get_valid_positions(board))
     assert len(valid) == 4
 
     def check(index, x, y, dir):

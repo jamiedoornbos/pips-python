@@ -4,7 +4,7 @@ from .domino import MAX_PIPS, Domino, PipCount
 from .location import Location
 from .locationset import LocationSet
 from .orientation import Orientation
-from .placement import Placement
+from .placement import Placement, Position
 from .vector import Vector
 
 __all__ = [
@@ -18,6 +18,7 @@ __all__ = [
     ConstraintType,
     LocationSet,
     Placement,
+    Position,
     BoardStatus,
     MAX_PIPS,
 ]
