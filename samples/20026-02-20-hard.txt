@@ -1,0 +1,31 @@
+
+      # Title
+        20026-02-20-hard
+      # Background
+        AA....BC
+        DE....FG
+        ........
+        ...HH...
+        ...IJ...
+        ........
+        KK....LM
+        NN....OO
+      # Constraints
+        A: eq 11
+        B: lt 2
+        C: gt 2
+        D: eq 1
+        E: lt 1
+        F: eq 2
+        G: eq 2
+        H: eq 3
+        I: eq 3
+        J: gt 3
+        K: eq 4
+        L: lt 5
+        M: gt 5
+        N: match
+        O: match
+      # Dominoes
+        41 22 11 12 36
+        03 06 61 23 05

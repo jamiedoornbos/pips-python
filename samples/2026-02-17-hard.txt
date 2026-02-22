@@ -1,0 +1,25 @@
+
+      # Title
+        2026-02-17-hard
+      # Background
+        @........
+        A....BC..
+        A..DDEEE@
+        AAFFEEE..
+        ...F@GGG@
+        .....HH
+      # Constraints
+        A: eq 7
+        B: gt 3
+        C: lt 3
+        D: eq 9
+        E: match
+        F: eq 1
+        G: match
+        H: eq 6
+      # Dominoes
+        36 01 35 41
+        65 32 04 52
+        03 22 05 02
+        55
+    

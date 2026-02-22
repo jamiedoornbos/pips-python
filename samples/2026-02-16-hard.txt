@@ -1,0 +1,28 @@
+
+      # Title
+        2026-02-16-hard
+      # Background
+        AAA......
+        A.B......
+        CCB......
+        ...DEE...
+        ...D.F...
+        ...GGF...
+        ......HHH
+        ......H.H
+        ......HH@
+      # Constraints
+        A: match
+        B: match
+        C: eq 2
+        D: eq 1
+        E: match
+        F: eq 7
+        G: eq 11
+        H: motMatch
+      # Dominoes
+        54 42 06 53
+        14 50 43 25
+        12 16 22 10
+
+    

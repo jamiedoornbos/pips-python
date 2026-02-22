@@ -1,0 +1,19 @@
+
+      # Title
+        2026-02-18-medium
+      # Background
+        ABBBC
+        ..D..
+        ..D..
+        E@FF@
+      # Constraints
+        A: lt 3
+        B: eq 11
+        C: gt 4
+        D: eq 8
+        E: gt 1
+        F: match
+      # Dominoes
+        01 55 43 15 22 61
+        
+    
