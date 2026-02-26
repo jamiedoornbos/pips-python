@@ -5,7 +5,10 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.14"
 dependencies = [
+    "cachetools>=7.0.1",
     "click>=8.3.1",
+    "fastapi[standard]>=0.129.2",
+    "psutil>=7.2.2",
 ]
 
 [dependency-groups]
@@ -19,4 +22,4 @@ line-length = 120
 format.quote-style = "single"
 
 [tool.ruff.lint]
-select = ["I"]
+extend-select = ["I"]
