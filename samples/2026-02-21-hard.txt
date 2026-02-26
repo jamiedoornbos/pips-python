@@ -1,0 +1,26 @@
+
+      # Title
+        202026-02-21-hard
+      # Background
+        ABBCDDDD
+        @.CC.E.D
+        E.CF.E.G
+        E.@F.E.G
+        HHHFII.J
+      # Constraints
+        A: eq 0
+        B: eq 0
+        C: eq 7
+        D: match
+        E: match
+        F: match
+        G: eq 7
+        H: eq 7
+        I: eq 7
+        J: eq 0
+      # Dominoes
+        50 23 55 00
+        56 11 52 41
+        66 30 51 02
+        45 13 46
+    

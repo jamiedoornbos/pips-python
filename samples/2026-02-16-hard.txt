@@ -19,7 +19,7 @@
         E: match
         F: eq 7
         G: eq 11
-        H: motMatch
+        H: notMatch
       # Dominoes
         54 42 06 53
         14 50 43 25

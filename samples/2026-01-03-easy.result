@@ -1,0 +1,8 @@
+{
+  "puzzle_name": "2026-01-03-easy",
+  "max_memory_usage_mb": 400465.84375,
+  "time_to_solve": "PT5.015033S",
+  "completion_time": "2026-02-26T05:35:01.750753Z",
+  "error": "Solver exited with status 2",
+  "solutions": []
+}
