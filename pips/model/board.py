@@ -3,8 +3,7 @@ import typing
 from .constraint import BoardState, Constraint
 from .domino import Domino, PipCount
 from .locationset import Location, LocationSet
-from .orientation import Orientation
-from .placement import Placement, Position
+from .placement import Placement
 
 BoardStatus = typing.Literal['won', 'lost', 'incomplete']
 

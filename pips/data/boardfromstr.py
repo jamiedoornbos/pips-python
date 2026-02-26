@@ -92,7 +92,7 @@ def read_board_from_string(serialized: str) -> Board:
             dominoes.append(_domino_from_string(pair))
 
     if not dominoes:
-        raise ValueError(f'No dominoes found')
+        raise ValueError('No dominoes found')
 
     # check for sizing
     if len(dominoes) * 2 != len(background):

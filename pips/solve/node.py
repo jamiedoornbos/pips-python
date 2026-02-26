@@ -9,7 +9,6 @@ from pips.model import (
     Constraint,
     ConstraintType,
     Location,
-    Orientation,
     PipCount,
     Placement,
     Position,
@@ -113,11 +112,17 @@ class Node:
             value = constraint.value
             match constraint.type:
                 case ConstraintType.EQUAL:
-                    check_sum = lambda test: test == value
+
+                    def check_sum(test):
+                        return test == value
                 case ConstraintType.LESS:
-                    check_sum = lambda test: test < value
+
+                    def check_sum(test):
+                        return test < value
                 case ConstraintType.GREATER:
-                    check_sum = lambda test: test > value
+
+                    def check_sum(test):
+                        return test > value
                 case _:
                     raise ValueError(f'Invalid sum constraint: {constraint}')
             for combo in itertools.combinations(available_pips, r=empty_count):

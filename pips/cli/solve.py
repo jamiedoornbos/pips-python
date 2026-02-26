@@ -2,7 +2,6 @@ import click
 
 from pips.data.boardfromstr import read_board_from_string
 from pips.model import Board
-from pips.solve.node import Node
 from pips.solve.solver import Solver
 
 

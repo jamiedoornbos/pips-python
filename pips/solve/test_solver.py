@@ -44,4 +44,4 @@ def test_valid_positions():
 
 def test_expand_next():
     solver = Solver(_board())
-    node = solver.expand_next()
+    solver.expand_next()
