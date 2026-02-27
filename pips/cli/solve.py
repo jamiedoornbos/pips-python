@@ -16,6 +16,14 @@ def print_placements(title: str, board: Board):
         print(f'  {placement}')
 
 
+def print_solutions(solver: Solver):
+    if solver.solutions:
+        for index, solution in enumerate(solver.solutions, 1):
+            print_placements(f'Solution #{index}', solution.board)
+    else:
+        print('No solutions found!')
+
+
 @click.command()
 @click.argument('filename')
 def main(filename: str):
@@ -38,11 +46,7 @@ def main(filename: str):
             print()
             break
 
-    if solver.solutions:
-        for index, solution in enumerate(solver.solutions, 1):
-            print_placements(f'Solution #{index}', solution.board)
-    else:
-        print('No solutions found!')
+    print_solutions(solver)
 
 
 if __name__ == '__main__':

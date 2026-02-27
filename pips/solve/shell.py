@@ -1,5 +1,6 @@
 import logging
 import os
+import re
 import subprocess
 import time
 from dataclasses import dataclass
@@ -9,11 +10,16 @@ from threading import Thread
 import psutil
 from pydantic import BaseModel
 
-from pips.app.models import PlacementModel
+from pips.app import models
 from pips.data.boardfromstr import read_board_from_string
 from pips.model import Board
 
 logger = logging.getLogger('pips.solve.shell')
+
+
+PLACEMENT = re.compile(
+    r'^  (?P<left>\d)(?P<right>\d) at \((?P<x>\d+), (?P<y>\d+)\) facing (?P<dir>north|south|east|west)'
+)
 
 
 class SolverJobModel(BaseModel):
@@ -64,9 +70,36 @@ class SolverJob:
     def __str__(self):
         return f'solver job for {self.model.puzzle_name} pid {self.model.pid}'
 
+    @staticmethod
+    def find_orientation(name: str):
+        for orientation in models.Orientation:
+            if orientation.value.name == name:
+                return orientation
+
+    @staticmethod
+    def parse_solutions(output: list[str]) -> list[list[models.PlacementModel]]:
+        solutions, solution = [], None
+        for chunk in output:
+            for line in chunk.split('\n'):
+                if line.startswith('Solution '):
+                    solutions.append(solution := [])
+                elif solution is not None and line.startswith('  '):
+                    match = PLACEMENT.match(line)
+                    if not match:
+                        raise ValueError(f'Unmatching line in solution: {line}')
+                    left, right, x, y = (int(match.group(name)) for name in ('left', 'right', 'x', 'y'))
+                    solution.append(
+                        models.PlacementModel(
+                            domino=models.Domino(left, right),
+                            loc=models.Location(x, y),
+                            dir=SolverJob.find_orientation(match.group('dir')),
+                        )
+                    )
+        return solutions
+
     def run(self):
         popen = subprocess.Popen(
-            ['python', '-m', 'pips.cli.solve', '--quiet', self.get_file('txt')],
+            ['python', '-m', 'pips.cli.solveproc', self.get_file('txt')],
             text=True,
             stderr=subprocess.STDOUT,
             stdout=subprocess.PIPE,
@@ -120,7 +153,7 @@ class SolverJob:
             time_to_solve=completion_time - self.model.start_time,
             completion_time=completion_time,
             error=None if return_code == 0 else f'Solver exited with status {return_code}',
-            solutions=[],
+            solutions=self.parse_solutions(output),
         )
         with open(self.get_file('result'), 'w') as fp:
             fp.write(result.model_dump_json(indent=2))
@@ -135,7 +168,7 @@ class SolverResultModel(BaseModel):
     time_to_solve: timedelta
     completion_time: datetime
     error: str | None
-    solutions: list[list[PlacementModel]]
+    solutions: list[list[models.PlacementModel]]
 
 
 class Shell:
