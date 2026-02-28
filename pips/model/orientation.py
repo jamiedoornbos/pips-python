@@ -16,6 +16,10 @@ class Orientation(enum.Enum):
     SOUTH = _Orientation('south', Vector(0, 1))
     WEST = _Orientation('west', Vector(-1, 0))
 
+    @staticmethod
+    def lookup_by_name(name: str):
+        return Orientation[name.upper()]
+
     @property
     def offset(self):
         return self.value.offset

@@ -1,6 +1,6 @@
 from typing import Annotated
 
-from pydantic import BaseModel, Field, field_serializer
+from pydantic import BaseModel, Field, field_serializer, BeforeValidator
 
 from pips.model import ConstraintType, Domino, Location, Orientation
 
@@ -24,7 +24,7 @@ class PuzzleModel(BaseModel):
 class PlacementModel(BaseModel):
     domino: Domino
     loc: Location
-    dir: Orientation
+    dir: Annotated[Orientation, BeforeValidator(Orientation.lookup_by_name)]
 
     @field_serializer('dir')
     def serialize_type(self, dir: Orientation, _info):
