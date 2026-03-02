@@ -1,0 +1,41 @@
+
+      # Title
+        2026-03-01-hard
+      # Background
+        A@BCDE
+        FGHI@J
+        KLMNOP
+        Q@RST@
+        U@@VWX
+      # Constraints
+        A: eq 4
+        B: eq 2
+        C: eq 1
+        D: eq 4
+        E: eq 4
+        F: eq 2
+        G: eq 2
+        H: eq 0
+        I: eq 2
+        J: eq 0
+        K: eq 4
+        L: eq 1
+        M: eq 0
+        N: eq 1
+        O: eq 0
+        P: eq 0
+        Q: eq 1
+        R: eq 4
+        S: eq 1
+        T: eq 0
+        U: eq 4
+        V: eq 1
+        W: eq 2
+        X: eq 2
+      # Dominoes
+        00 01 02 03 04
+        11 12 13 14
+        22 23 24
+        33 34
+        44
+    

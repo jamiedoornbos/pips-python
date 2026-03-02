@@ -1,0 +1,34 @@
+
+      # Title
+        2026-02-26-hard
+      # Background
+        ABC.EEF
+        G.H.I.J
+        KLH.III
+        .......
+        SSS.MNN
+        O.S.M.N
+        OOP.QRN
+      # Constraints
+        A: lt 4
+        B: eq 4
+        C: lt 4
+        E: eq 4
+        F: gt 4
+        G: gt 4
+        H: eq 4
+        I: eq 4
+        J: eq 4
+        K: gt 4
+        L: eq 4
+        M: eq 4
+        N: match
+        O: match
+        P: gt 4
+        Q: lt 4
+        R: gt 4
+        S: eq 4
+      # Dominoes
+        55 35 33 13 40 64 23 62 15 25 11 34 56 00 02 44
+
+    

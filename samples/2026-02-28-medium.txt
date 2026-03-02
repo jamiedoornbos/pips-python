@@ -1,0 +1,23 @@
+
+      # Title
+        2026-02-28-medium
+      # Background
+        .AB.
+        .AC.
+        .DC.
+        .EC.
+        .EC.
+        .EF.
+        GFFH
+      # Constraints
+        A: eq 9
+        B: gt 1
+        C: eq 3
+        D: eq 0
+        E: match
+        F: eq 15
+        G: gt 0
+        H: gt 1
+      # Dominoes
+        05 62 04 11 25 14 22 21
+    

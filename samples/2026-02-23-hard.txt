@@ -1,0 +1,28 @@
+
+      # Title
+        2026-02-23-hard
+      # Background
+        ...A...
+        ...A...
+        ..@B@..
+        @CDBBEE
+        .CD@BE.
+        .@FGHH.
+        ...G...
+        .@@III.
+      # Constraints
+        A: eq 4
+        B: eq 4
+        C: eq 11
+        D: eq 4
+        E: eq 17
+        F: eq 4
+        G: eq 12
+        H: eq 4
+        I: eq 9
+      # Dominoes
+        63 40 06 12
+        00 33 25 11
+        02 66 22 50
+        26 01
+    

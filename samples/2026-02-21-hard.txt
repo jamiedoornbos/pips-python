@@ -1,6 +1,6 @@
 
       # Title
-        202026-02-21-hard
+        2026-02-21-hard
       # Background
         ABBCDDDD
         @.CC.E.D

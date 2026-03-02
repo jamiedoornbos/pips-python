@@ -1,0 +1,24 @@
+
+      # Title
+        2026-03-01-medium
+      # Background
+        AAB.....
+        C...DDE.
+        CF..G..@
+        C...G..@
+        HII.JJK.
+      # Constraints
+        A: eq 4
+        B: gt 4
+        C: match
+        D: eq 9
+        E: lt 4
+        F: lt 4
+        G: match
+        H: eq 0
+        I: eq 9
+        J: eq 1
+        K: gt 4
+      # Dominoes
+        26 41 45 03 44 36 24 61 40 32
+

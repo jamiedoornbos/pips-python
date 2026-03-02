@@ -1,6 +1,6 @@
 
       # Title
-        20026-02-20-hard
+        2026-02-20-hard
       # Background
         AA....BC
         DE....FG
