@@ -24,7 +24,7 @@ def test_parse_solutions():
 def test_solver_result_deserialize():
     serialized = """{
   "puzzle_name": "2026-02-18-medium",
-  "max_memory_usage_mb": 400449.265625,
+  "peak_memory_usage_mb": 400449.265625,
   "time_to_solve": "PT5.011884S",
   "completion_time": "2026-02-27T16:49:17.980208Z",
   "error": null,
@@ -303,4 +303,4 @@ def test_solver_result_deserialize():
     ]
   ]
 }"""
-    result = SolverResultModel.model_validate_json(serialized)
+    SolverResultModel.model_validate_json(serialized)

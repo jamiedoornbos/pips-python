@@ -92,14 +92,14 @@ class SolverJob:
                         models.PlacementModel(
                             domino=models.Domino(left, right),
                             loc=models.Location(x, y),
-                            dir=SolverJob.find_orientation(match.group('dir')),
+                            dir=match.group('dir'),
                         )
                     )
         return solutions
 
     def run(self):
         popen = subprocess.Popen(
-            ['python', '-m', 'pips.cli.solveproc', self.get_file('txt')],
+            ['python', '-u', '-m', 'pips.cli.solveproc', self.get_file('txt')],
             text=True,
             stderr=subprocess.STDOUT,
             stdout=subprocess.PIPE,
@@ -117,28 +117,32 @@ class SolverJob:
 
         def read_output():
             logger.info(f'Beginning read output for {self}')
-            while True:
-                stdout, _ = popen.communicate(timeout=5)
-                if stdout:
-                    output.append(stdout)
-                if popen.poll() is not None:
-                    break
+            for line in popen.stdout:
+                output.append(line)
             logger.info(f'Finished reading output for {self}')
 
         thread = Thread(target=read_output)
         thread.start()
 
-        max_memory_usage = self.model.memory_usage_mb
+        peak_memory_usage = self.model.memory_usage_mb
+        termination_reason = None
         logger.info(f'Beginning waiting for {self}')
         while True:
-            time.sleep(5)
+            time.sleep(2)
             if popen.poll() is not None:
                 break
-            self.model.memory_usage_mb = process.memory_info().vms / (2**20)
-            if self.model.memory_usage_mb > max_memory_usage:
-                max_memory_usage = self.model.memory_usage_mb
+            self.model.memory_usage_mb = memory_usage = process.memory_info().rss / (2**20)
+            # print(f'memory_info {process.memory_info()}')
+            if memory_usage > peak_memory_usage:
+                peak_memory_usage = memory_usage
             self.model.output = list(output)
             self.save()
+
+            if memory_usage > memory_limit_mb:
+                logger.info(f'Termainting solver job {self} for exceeding memory limit: {memory_usage}')
+                termination_reason = 'Exceeded memory limit'
+                popen.terminate()
+
         logger.info(f'Finished waiting for {self}')
 
         thread.join()
@@ -147,12 +151,20 @@ class SolverJob:
 
         completion_time = datetime.now(UTC)
         return_code = popen.returncode
+        if not return_code and termination_reason:
+            return_code = -99
         result = SolverResultModel(
             puzzle_name=self.model.puzzle_name,
-            max_memory_usage_mb=max_memory_usage,
+            peak_memory_usage_mb=peak_memory_usage,
             time_to_solve=completion_time - self.model.start_time,
             completion_time=completion_time,
-            error=None if return_code == 0 else f'Solver exited with status {return_code}',
+            error=(
+                termination_reason
+                if termination_reason
+                else f'Solver exited with status {return_code}'
+                if return_code
+                else None
+            ),
             solutions=self.parse_solutions(output),
         )
         with open(self.get_file('result'), 'w') as fp:
@@ -164,7 +176,7 @@ class SolverJob:
 
 class SolverResultModel(BaseModel):
     puzzle_name: str
-    max_memory_usage_mb: float
+    peak_memory_usage_mb: float
     time_to_solve: timedelta
     completion_time: datetime
     error: str | None
