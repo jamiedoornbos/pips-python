@@ -35,12 +35,9 @@ class SolverJob:
     shell: Shell
     model: SolverJobModel
 
-    def get_file(self, extension: str):
-        return self.shell.get_file(self.model.puzzle_name, extension)
-
     @property
     def file(self):
-        return self.get_file('solver')
+        return self.shell._data_file(self.model.puzzle_name, 'solver')
 
     def save(self):
         with open(self.file, 'w') as fp:
@@ -58,6 +55,7 @@ class SolverJob:
                 output=[],
             ),
         )
+        os.makedirs(os.path.dirname(solver_job.file), exist_ok=True)
         # mutex
         with open(solver_job.file, 'x'):
             pass
@@ -99,7 +97,7 @@ class SolverJob:
 
     def run(self):
         popen = subprocess.Popen(
-            ['python', '-u', '-m', 'pips.cli.solveproc', self.get_file('txt')],
+            ['python', '-u', '-m', 'pips.cli.solveproc', self.shell.get_puzzle_file(self.model.puzzle_name)],
             text=True,
             stderr=subprocess.STDOUT,
             stdout=subprocess.PIPE,
@@ -107,8 +105,9 @@ class SolverJob:
         )
         self.model.pid = popen.pid
         process = psutil.Process(self.model.pid)
+        memory_limit_mb = 2**13  # 8 GiB
         # process.rlimit(psutil.RLIMIT_AS, (2 ** 33,) * 2)  # 8 GiB soft & hard
-        self.model.memory_usage_mb = process.memory_info().vms / (2**20)
+        self.model.memory_usage_mb = process.memory_info().rss / (2**20)
         self.save()
 
         logger.info(f'Launched process for {self}')
@@ -167,7 +166,7 @@ class SolverJob:
             ),
             solutions=self.parse_solutions(output),
         )
-        with open(self.get_file('result'), 'w') as fp:
+        with open(self.shell._data_file(self.model.puzzle_name, 'result'), 'w') as fp:
             fp.write(result.model_dump_json(indent=2))
 
         logger.info(f'Removing record of {self}')
@@ -184,21 +183,22 @@ class SolverResultModel(BaseModel):
 
 
 class Shell:
-    def __init__(self, dir_: str, exclude: set[str]):
-        self.dir = dir_
+    def __init__(self, samples_dir: str, data_dir: str, exclude: set[str]):
+        self.samples_dir = samples_dir
+        self.data_dir = data_dir
         self.exclude = exclude
 
-    def _list(self, extension: str) -> iter[str]:
-        for name in os.listdir(self.dir):
-            if name.endswith(extension):
-                yield name[: -len(extension)], os.path.join(self.dir, name)
-
-    def get_file(self, puzzle_name: str, extension: str):
-        return os.path.join(self.dir, f'{puzzle_name}.{extension}')
+    # def get_file(self, puzzle_name: str, extension: str):
+    #     return os.path.join(self.samples_dir, f'{puzzle_name}.{extension}')
 
     def get_boards(self) -> dict[str, Board]:
         boards = {}
-        for name, puzzle_file in sorted(self._list('.txt')):
+        puzzle_files = []
+        for name in os.listdir(self.samples_dir):
+            if name.endswith('.txt'):
+                puzzle_files.append((name[:-4], os.path.join(self.samples_dir, name)))
+
+        for name, puzzle_file in sorted(puzzle_files):
             if name in self.exclude:
                 continue
             try:
@@ -208,8 +208,18 @@ class Shell:
                 logger.exception(f'Failed to load puzzle {puzzle_file}')
         return boards
 
+    def get_puzzle_file(self, puzzle_name: str) -> str:
+        return os.path.join(self.samples_dir, f'{puzzle_name}.txt')
+
+    def get_board(self, puzzle_name: str) -> Board:
+        with open(self.get_puzzle_file(puzzle_name)) as fp:
+            read_board_from_string(fp.read())
+
+    def _data_file(self, puzzle_name: str, name: str):
+        return os.path.join(self.data_dir, puzzle_name, name)
+
     def get_solver_job(self, puzzle_name: str) -> SolverJobModel | None:
-        path = self.get_file(puzzle_name, 'solver')
+        path = self._data_file(puzzle_name, 'solver')
         try:
             if os.path.exists(path):
                 with open(path) as fp:
@@ -220,7 +230,7 @@ class Shell:
         return None
 
     def get_solver_result(self, puzzle_name: str) -> SolverResultModel | None:
-        path = self.get_file(puzzle_name, 'result')
+        path = self._data_file(puzzle_name, 'result')
         try:
             if os.path.exists(path):
                 with open(path) as fp:
@@ -229,20 +239,19 @@ class Shell:
             logger.exception(f'Unable to load solver result for {path}')
         return None
 
-    def get_solvers(self) -> iter[SolverJobModel]:
-        for name, pid_file in self._list('.solver'):
-            try:
-                yield self.get_solver_job(name)
-            except Exception:
-                logger.exception(f'Could not load solver for name `{name}`, file `{pid_file}`')
+    # def get_solvers(self) -> iter[SolverJobModel]:
+    #     for name, pid_file in self._list('.solver'):
+    #         try:
+    #             yield self.get_solver_job(name)
+    #         except Exception:
+    #             logger.exception(f'Could not load solver for name `{name}`, file `{pid_file}`')
 
     def launch_solver(self, puzzle_name):
         try:
-            with open(self.get_file(puzzle_name, 'txt')) as fp:
-                read_board_from_string(fp.read())
+            self.get_board(puzzle_name)
             return SolverJob.start(self, puzzle_name).model
         except Exception as ex:
             raise RuntimeError(f'Could not launch solver for {puzzle_name}') from ex
 
-    def refresh_all_solvers(self):
-        pass
+    # def refresh_all_solvers(self):
+    #     pass

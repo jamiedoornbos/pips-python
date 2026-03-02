@@ -1,6 +1,6 @@
 from typing import Annotated
 
-from pydantic import BaseModel, Field, field_serializer, BeforeValidator
+from pydantic import BaseModel, BeforeValidator, Field, field_serializer
 
 from pips.model import ConstraintType, Domino, Location, Orientation
 

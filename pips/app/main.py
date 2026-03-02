@@ -1,5 +1,4 @@
 import logging
-from typing import Optional
 
 import cachetools
 from fastapi import FastAPI, HTTPException
@@ -12,7 +11,7 @@ logging.basicConfig(level=logging.INFO)
 
 app = FastAPI()
 logger = logging.getLogger('app')
-shell = Shell('samples', {'template'})
+shell = Shell('samples', 'local-data/puzzles', {'template'})
 
 
 @cachetools.cached(cache=cachetools.TTLCache(maxsize=10, ttl=60))
