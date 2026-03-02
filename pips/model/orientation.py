@@ -26,3 +26,6 @@ class Orientation(enum.Enum):
 
     def __str__(self):
         return self.value.name
+
+    def __lt__(self, other):
+        return self.offset < other.offset

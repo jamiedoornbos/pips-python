@@ -1,5 +1,6 @@
 import collections
 import itertools
+import math
 import typing
 
 from pips.model import (
@@ -29,6 +30,9 @@ class SolverCaches:
 class SolverDebug:
     def add_message(self, node: Node, message: str):
         pass
+
+    def is_debugging(self):
+        return False
 
 
 class Node:
@@ -208,3 +212,73 @@ class Node:
                         return 'matching pips added'
 
         return None
+
+    def get_best_location_to_expand(self, solver: SolverCaches, debug: SolverDebug) -> tuple[Location, list[Placement]]:
+        # rank positions by constraints they touch
+        def rank_constraint(constraint: Constraint) -> float:
+            if constraint.type.is_sum:
+                avg_pip_count = constraint.value / len(constraint.tiles)
+                return 1 + (3 - math.fabs(avg_pip_count - 3)) ** 2
+            return len(constraint.tiles)
+
+        def rank_position(position: Position):
+            constraints = [
+                solver.get_constraint(position.loc),
+                solver.get_constraint(position.loc + position.dir.offset),
+            ]
+            if constraints[0]:
+                rank = rank_constraint(constraints[0])
+                if constraints[0] == constraints[1] or not constraints[1]:
+                    return rank
+                else:
+                    return (rank + rank_constraint(constraints[1])) / 2
+            elif constraints[1]:
+                return rank_constraint(constraints[1])
+            return 30
+
+        position_ranks = {position: rank_position(position) for position in solver.get_valid_positions(self.board)}
+        location_positions: dict[Location, list[Position]] = collections.defaultdict(list)
+        for position in position_ranks.keys():
+            location_positions[position.loc].append(position)
+            location_positions[position.loc + position.dir.offset].append(position)
+
+        location_ranks = sorted(
+            (sum(position_ranks[position] for position in positions), location, positions)
+            for location, positions in location_positions.items()
+        )
+        if debug.is_debugging():
+            debug.add_message(self, 'Location Ranks')
+            for rank, location, positions in location_ranks:
+                debug.add_message(self, f'  {rank}: {location}: {[str(pos) for pos in positions]}')
+
+        remaining = self._board._remaining_dominoes
+        placement_cache: dict[Placement, str] = {}
+        best_location: Location | None = None
+        best_placements: list[Placement] | None = None
+        for _, location, positions in location_ranks:
+            valid_placements = []
+            for placement in (
+                Placement(domino, position) for domino, position in itertools.product(remaining, positions)
+            ):
+                if not (expand_result := placement_cache.get(placement)):
+                    violation = self._expand_at(solver, placement)
+                    expand_result = violation if violation else 'ok'
+                if expand_result == 'ok':
+                    valid_placements.append(placement)
+                    if best_placements and len(valid_placements) >= len(best_placements):
+                        debug.add_message(self, f'Location {location} defeated after exceeding {len(best_placements)}')
+                        break
+            if len(valid_placements) == 0:
+                raise ValueError(f'Location {location} had no valid placements')
+            if not best_placements or len(valid_placements) < len(best_placements):
+                print(f'New current winner: location {location} with {len(valid_placements)} placements')
+                best_location = location
+                best_placements = valid_placements
+
+        return best_location, best_placements
+
+        # positions = sorted(solver.get_valid_positions(self.board), key=rank_position)
+        # remaining = self._board._remaining_dominoes
+        # best_domino_placements = (None, [])
+        # for position in positions:
+        #     print(f'{position}')
