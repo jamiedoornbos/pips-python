@@ -271,7 +271,9 @@ class Node:
             if len(valid_placements) == 0:
                 raise ValueError(f'Location {location} had no valid placements')
             if not best_placements or len(valid_placements) < len(best_placements):
-                print(f'New current winner: location {location} with {len(valid_placements)} placements')
+                debug.add_message(
+                    self, f'New current winner: location {location} with {len(valid_placements)} placements'
+                )
                 best_location = location
                 best_placements = valid_placements
 

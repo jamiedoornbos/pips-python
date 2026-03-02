@@ -1,10 +1,13 @@
+import os
 import re
+import uuid
 
 import click
 
-from pips.data.boardfromstr import read_board_from_string
+import pips.app.models
 from pips.model import Board, Domino, Location, Orientation, Placement, Position
 from pips.solve.node import Node, SolverDebug
+from pips.solve.shell import Shell, SolverNodeModel
 from pips.solve.solver import Solver
 
 
@@ -43,23 +46,33 @@ def create_placement(option: str) -> Placement:
 
 
 @click.command()
-@click.argument('filename')
-@click.option('--placement', '-p', type=create_placement, multiple=True)
+@click.argument('puzzle-name')
+@click.option('--placement', '-p', 'start_placements', type=create_placement, multiple=True)
+@click.option('--start-node', '-s', 'start_node_id')
 @click.option('--debug/--no-debug')
-def main(filename: str, placement: list[Placement], debug: bool):
-    with open(filename, encoding='utf8') as fp:
-        board = read_board_from_string(fp.read())
+@click.option('--save-nodes/--no-save-nodes')
+def main(puzzle_name: str, start_placements: list[Placement], debug: bool, start_node_id: str, save_nodes: bool):
+    shell = Shell('samples', 'local-data/puzzles', set())
+    board = shell.get_board(puzzle_name)
 
     print(f'Loaded board: {board}')
-    if placement:
-        for p in placement:
-            print(f'  Adding placement {p}')
-            board.place(p)
+    if start_node_id:
+        if not (start_node := shell.get_solver_node(puzzle_name, start_node_id)):
+            raise click.ClickException(f'Node {start_node_id} not found')
+        print(f'  Adding placements from node {start_node_id}')
+        start_placements += tuple(
+            Placement(Domino(*p.domino), Position(Location(*p.loc), p.dir)) for p in start_node.placements
+        )
+
+    if start_placements:
+        for placement in start_placements:
+            print(f'  Adding placement {placement}')
+            board.place(placement)
     solver = Solver(board)
     node = Node(board)
 
     class Debug(SolverDebug):
-        def add_message(self, node, message):
+        def add_message(self, _node, message):
             if debug:
                 return print(message)
 
@@ -68,9 +81,27 @@ def main(filename: str, placement: list[Placement], debug: bool):
 
     location, placements = node.get_best_location_to_expand(solver, Debug())
 
+    def to_pydantic(placement: Placement) -> pips.app.models.PlacementModel:
+        return pips.app.models.PlacementModel(
+            domino=placement.domino,
+            loc=placement.pos.loc,
+            dir=placement.pos.dir.value.name,
+        )
+
     print(f'Best location: {location}')
     for placement in placements:
         print(f'  Placements: {placement}')
+        if save_nodes:
+            node_id = uuid.uuid4()
+            pydantic_placements = [to_pydantic(p) for p in [*start_placements, placement]]
+            os.makedirs(shell._data_file(puzzle_name, 'nodes'), exist_ok=True)
+            with open(shell._data_file(puzzle_name, f'nodes/{node_id}'), 'w') as fp:
+                fp.write(
+                    SolverNodeModel(
+                        puzzle_name=puzzle_name, id=str(node_id), placements=pydantic_placements
+                    ).model_dump_json(indent=2)
+                )
+            print(f'    Saved node {node_id}')
 
     # valid_positions = solver.get_valid_positions(board)
     # print(f'Valid positions ({len(valid_positions)})')
