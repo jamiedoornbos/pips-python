@@ -57,6 +57,6 @@ async def get_solver_node_ids(puzzle_name) -> list[str]:
     return shell.get_solver_node_ids(puzzle_name)
 
 
-@app.get('/api/puzzles/{puzzle_name}/solverNodes/{node_id}')
+@app.get('/api/puzzles/{puzzle_name}/solverNodes/{node_id:path}')
 async def get_solver_node(puzzle_name, node_id) -> SolverNodeModel:
     return shell.get_solver_node(puzzle_name, node_id)

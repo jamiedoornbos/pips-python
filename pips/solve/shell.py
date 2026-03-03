@@ -3,7 +3,6 @@ import os
 import re
 import subprocess
 import time
-import uuid
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from threading import Thread
@@ -34,6 +33,7 @@ class SolverJobModel(BaseModel):
 class SolverNodeModel(BaseModel):
     puzzle_name: str
     id: str
+    status: str
     placements: list[models.PlacementModel]
 
 
@@ -246,17 +246,21 @@ class Shell:
             logger.exception(f'Unable to load solver result for {path}')
         return None
 
-    def get_solver_node_ids(self, puzzle_name: str) -> list[str]:
-        nodes = self._data_file(puzzle_name, 'nodes')
+    def get_solver_node_ids(self, puzzle_name: str, status: str | None = None) -> list[str]:
+        nodes = self._data_file(puzzle_name, 'nodes/')
         if not os.path.exists(nodes):
             return []
-        return os.listdir(nodes)
+        status_filename = f'status={status}' if status else None
+        return [
+            dirpath[len(nodes) :]
+            for dirpath, dirnames, filenames in os.walk(nodes)
+            if 'state' in filenames and (not status_filename or status_filename in filenames)
+        ]
 
-    def get_solver_node(self, puzzle_name: str, node_id: str) -> SolverNodeModel:
-        uuid.UUID(str(node_id))
-        node_path = self._data_file(puzzle_name, f'nodes/{node_id}')
+    def get_solver_node(self, puzzle_name: str, node_id: str) -> SolverNodeModel | None:
+        node_path = self._data_file(puzzle_name, f'nodes/{node_id}/state')
         if not os.path.exists(node_path):
-            raise RuntimeError(f'File not found: {node_path}')
+            return None
         with open(node_path) as fp:
             return SolverNodeModel.model_validate_json(fp.read())
 

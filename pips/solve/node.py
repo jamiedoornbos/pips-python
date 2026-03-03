@@ -57,10 +57,13 @@ class Node:
         return self._status
 
     def expand(self, solver: SolverCaches, debug: SolverDebug):
+        if not self.board.empty_locations:
+            self._status = self._board.test_finished().status
+            return
+
         # check that each constraint is potentially solvable
-        remaining = self._board._remaining_dominoes
         available_pips: list[PipCount] = []
-        for domino in remaining:
+        for domino in self._board.remaining_dominoes:
             for pips in domino.pips:
                 available_pips.append(pips)
 
@@ -70,22 +73,8 @@ class Node:
                 self._status = 'lost'
                 return
 
-        # find the valid location and orientation pairs
-        valid_positions = solver.get_valid_positions(self._board)
-        to_place: list[Placement] = []
-        for domino in remaining:
-            valid_count = 0
-            for position in valid_positions:
-                test_placement = Placement(domino, position)
-                if rejection := self._expand_at(solver, test_placement):
-                    debug.add_message(self, rejection)
-                    continue
-                to_place.append(test_placement)
-                valid_count += 1
-            if valid_count == 0:
-                debug.add_message(self, f'Aborted expansion because {domino} has no valid placements')
-                self._status = 'lost'
-                return
+        # to_place = self._expand_using_brute_force(solver, debug)
+        _, to_place = self._expand_using_ranked_locations(solver, debug)
 
         # spawn the children
         child_count = 0
@@ -101,7 +90,27 @@ class Node:
         debug.add_message(self, f'Found {len(to_place)} placements and added {child_count} unique children')
 
         # set closure status
-        self._status = self._board.test_finished().status if len(remaining) == 0 else 'incomplete'
+        self._status = 'incomplete'
+
+    def _expand_using_brute_force(self, solver: SolverCaches, debug: SolverDebug) -> list[Placement]:
+        # find the valid location and orientation pairs
+        valid_positions = solver.get_valid_positions(self._board)
+        to_place: list[Placement] = []
+        for domino in self._board.remaining_dominoes:
+            valid_count = 0
+            for position in valid_positions:
+                test_placement = Placement(domino, position)
+                if rejection := self._expand_at(solver, test_placement):
+                    debug.add_message(self, rejection)
+                    continue
+                to_place.append(test_placement)
+                valid_count += 1
+            if valid_count == 0:
+                debug.add_message(self, f'Aborted expansion because {domino} has no valid placements')
+                self._status = 'lost'
+                return []
+
+        return to_place
 
     def _can_meet(self, constraint: Constraint, available_pips: list[PipCount]):
         all_slots = [self._board.get_pips(location) for location in constraint.tiles]
@@ -161,7 +170,7 @@ class Node:
         violation = None
 
         # check out of bounds (only the right side)
-        if slots[1][0] not in self._board.empty_locations:
+        if slots[1].loc not in self._board.empty_locations:
             violation = 'it is off the board'
         else:
             if slots[0].constraint and slots[0].constraint == slots[1].constraint:
@@ -213,30 +222,38 @@ class Node:
 
         return None
 
-    def get_best_location_to_expand(self, solver: SolverCaches, debug: SolverDebug) -> tuple[Location, list[Placement]]:
-        # rank positions by constraints they touch
-        def rank_constraint(constraint: Constraint) -> float:
-            if constraint.type.is_sum:
-                avg_pip_count = constraint.value / len(constraint.tiles)
-                return 1 + (3 - math.fabs(avg_pip_count - 3)) ** 2
-            return len(constraint.tiles)
+    @staticmethod
+    def _rank_constraint(constraint: Constraint) -> float:
+        """Rank constraints"""
+        if constraint.type.is_sum:
+            avg_pip_count = constraint.value / len(constraint.tiles)
+            return 1 + (3 - math.fabs(avg_pip_count - 3)) ** 2
+        return len(constraint.tiles)
 
-        def rank_position(position: Position):
-            constraints = [
-                solver.get_constraint(position.loc),
-                solver.get_constraint(position.loc + position.dir.offset),
-            ]
-            if constraints[0]:
-                rank = rank_constraint(constraints[0])
-                if constraints[0] == constraints[1] or not constraints[1]:
-                    return rank
-                else:
-                    return (rank + rank_constraint(constraints[1])) / 2
-            elif constraints[1]:
-                return rank_constraint(constraints[1])
-            return 30
+    @staticmethod
+    def _rank_position(position: Position, solver: SolverCaches):
+        """Rank positions by constraints they touch"""
+        constraints = [
+            solver.get_constraint(position.loc),
+            solver.get_constraint(position.loc + position.dir.offset),
+        ]
+        rank_constraint = Node._rank_constraint
+        if constraints[0]:
+            rank = rank_constraint(constraints[0])
+            if constraints[0] == constraints[1] or not constraints[1]:
+                return rank
+            else:
+                return (rank + rank_constraint(constraints[1])) / 2
+        elif constraints[1]:
+            return rank_constraint(constraints[1])
+        return 30
 
-        position_ranks = {position: rank_position(position) for position in solver.get_valid_positions(self.board)}
+    def _rank_available_locations(
+        self, solver: SolverCaches, debug: SolverDebug
+    ) -> list[tuple[Location, list[Position]]]:
+        position_ranks = {
+            position: self._rank_position(position, solver) for position in solver.get_valid_positions(self.board)
+        }
         location_positions: dict[Location, list[Position]] = collections.defaultdict(list)
         for position in position_ranks.keys():
             location_positions[position.loc].append(position)
@@ -250,26 +267,33 @@ class Node:
             debug.add_message(self, 'Location Ranks')
             for rank, location, positions in location_ranks:
                 debug.add_message(self, f'  {rank}: {location}: {[str(pos) for pos in positions]}')
+        return [(location, positions) for _, location, positions in location_ranks]
 
+    def _expand_using_ranked_locations(
+        self, solver: SolverCaches, debug: SolverDebug
+    ) -> tuple[Location, list[Placement]]:
         remaining = self._board._remaining_dominoes
         placement_cache: dict[Placement, str] = {}
         best_location: Location | None = None
         best_placements: list[Placement] | None = None
-        for _, location, positions in location_ranks:
+        for location, positions in self._rank_available_locations(solver, debug):
             valid_placements = []
             for placement in (
                 Placement(domino, position) for domino, position in itertools.product(remaining, positions)
             ):
                 if not (expand_result := placement_cache.get(placement)):
                     violation = self._expand_at(solver, placement)
-                    expand_result = violation if violation else 'ok'
+                    placement_cache[placement] = expand_result = violation if violation else 'ok'
                 if expand_result == 'ok':
                     valid_placements.append(placement)
                     if best_placements and len(valid_placements) >= len(best_placements):
                         debug.add_message(self, f'Location {location} defeated after exceeding {len(best_placements)}')
                         break
             if len(valid_placements) == 0:
-                raise ValueError(f'Location {location} had no valid placements')
+                debug.add_message(self, f'Aborted expansion because location {location} has no valid placements')
+                self._status = 'lost'
+                return None, []
+
             if not best_placements or len(valid_placements) < len(best_placements):
                 debug.add_message(
                     self, f'New current winner: location {location} with {len(valid_placements)} placements'

@@ -46,6 +46,10 @@ class Board(BoardState):
     def empty_locations(self) -> LocationSet:
         return self._empty_locations
 
+    @property
+    def remaining_dominoes(self) -> typing.Sequence[Domino]:
+        return self._remaining_dominoes
+
     def get_pips(self, location: Location) -> PipCount | None:
         return self._board_state.get(location)
 
