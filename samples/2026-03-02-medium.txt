@@ -1,0 +1,16 @@
+
+      # Title
+        2026-03-02-medium
+      # Background
+        .AAB
+        CC.B
+        @CDE
+        @@@E
+      # Constraints
+        A: eq 10
+        B: eq 10
+        C: eq 10
+        D: gt 0
+        E: gt 10
+      # Dominoes
+        54 04 06 23 65 00 55

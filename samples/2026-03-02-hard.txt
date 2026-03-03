@@ -1,0 +1,27 @@
+
+      # Title
+        2026-03-02-hard
+      # Background
+        .AB......
+        CBB......
+        ..D..EF..
+        ..D.GEEH.
+        ..IIGEJHH
+        ...@KELLM
+      # Constraints
+        A: eq 1
+        B: match
+        C: eq 2
+        D: eq 4
+        E: match
+        F: lt 2
+        G: eq 10
+        H: match
+        I: eq 12
+        J: eq 1
+        K: gt 0
+        L: eq 6
+        M: eq 2
+      # Dominoes
+        43 03 55 46 13 24 65 14 32 61 54 44 51
+    

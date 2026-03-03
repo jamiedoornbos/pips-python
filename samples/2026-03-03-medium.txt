@@ -1,0 +1,18 @@
+
+      # Title
+        2026-03-03-medium
+      # Background
+        ABBCDD
+        .EFCD.
+        .HFII.
+      # Constraints
+        A: eq 3
+        B: eq 8
+        C: eq 8
+        D: eq 8
+        E: eq 5
+        F: eq 2
+        H: lt 2
+        I: eq 8
+      # Dominoes
+        31 46 25 12 33 05 34
