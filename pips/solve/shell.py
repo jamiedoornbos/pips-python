@@ -1,3 +1,4 @@
+import typing
 import logging
 import os
 import re
@@ -175,7 +176,7 @@ class SolverJob:
         )
         with open(self.shell._data_file(self.model.puzzle_name, 'result'), 'w') as fp:
             fp.write(result.model_dump_json(indent=2))
-
+        self.shell.set_result_status(self.model.puzzle_name, 'error' if result.error else 'solved' if result.solutions else 'no_solutions')
         logger.info(f'Removing record of {self}')
         os.unlink(self.file)
 
@@ -189,6 +190,14 @@ class SolverResultModel(BaseModel):
     solutions: list[list[models.PlacementModel]]
 
 
+ResultStatus = typing.Literal['not_run', 'no_solutions', 'error', 'solved']
+
+FileSuffix: dict[str, ResultStatus] = {
+    'nos': 'no_solutions',
+    'err': 'error',
+    'sol': 'solved'
+}
+
 class Shell:
     def __init__(self, samples_dir: str, data_dir: str, exclude: set[str]):
         self.samples_dir = samples_dir
@@ -198,7 +207,17 @@ class Shell:
     # def get_file(self, puzzle_name: str, extension: str):
     #     return os.path.join(self.samples_dir, f'{puzzle_name}.{extension}')
 
-    def get_boards(self) -> dict[str, Board]:
+    def set_result_status(self, puzzle_name, status: ResultStatus):
+        for suffix, test_status in FileSuffix.items():
+            file_path = self._data_file(puzzle_name, f'result.{suffix}')
+            exists = os.path.exists(file_path)
+            if exists and status != test_status:
+                os.unlink(file_path)
+            elif not exists and status == test_status:
+                with open(file_path, 'w'):
+                    pass
+
+    def get_boards(self) -> dict[str, tuple[Board, ResultStatus]]:
         boards = {}
         puzzle_files = []
         for name in os.listdir(self.samples_dir):
@@ -210,7 +229,12 @@ class Shell:
                 continue
             try:
                 with open(puzzle_file) as fp:
-                    boards[name] = read_board_from_string(fp.read())
+                    board = read_board_from_string(fp.read())
+                status: ResultStatus = 'not_run'
+                for suffix, test_status in FileSuffix.items():
+                    if os.path.exists(self._data_file(name, f'result.{suffix}')):
+                        status = test_status
+                boards[name] = (board, status)
             except ValueError:
                 logger.exception(f'Failed to load puzzle {puzzle_file}')
         return boards

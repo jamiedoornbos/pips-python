@@ -5,7 +5,7 @@ from fastapi import FastAPI, HTTPException
 
 from pips.app.models import PuzzleModel
 from pips.model import Board
-from pips.solve.shell import Shell, SolverJobModel, SolverNodeModel, SolverResultModel
+from pips.solve.shell import Shell, SolverJobModel, SolverNodeModel, SolverResultModel, ResultStatus
 
 logging.basicConfig(level=logging.INFO)
 
@@ -15,7 +15,7 @@ shell = Shell('samples', 'local-data/puzzles', {'template'})
 
 
 @cachetools.cached(cache=cachetools.TTLCache(maxsize=10, ttl=60))
-def cache() -> dict[str, Board]:
+def cache() -> dict[str, tuple[Board, ResultStatus]]:
     return shell.get_boards()
 
 
@@ -25,13 +25,13 @@ async def root():
 
 
 @app.get('/api/puzzleNames')
-async def get_puzzle_names() -> list[str]:
-    return list(cache().keys())
+async def get_puzzle_names() -> list[tuple[str, ResultStatus]]:
+    return [(name, board[1]) for name, board in cache().items()]
 
 
 @app.get('/api/puzzles/{puzzle_name}')
 async def get_puzzle(puzzle_name) -> PuzzleModel:
-    board = cache().get(puzzle_name)
+    board, status = cache().get(puzzle_name)
     if not board:
         raise HTTPException(404, 'Puzzle not found')
     return board
