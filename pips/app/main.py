@@ -5,7 +5,7 @@ from fastapi import FastAPI, HTTPException
 
 from pips.app.models import PuzzleModel
 from pips.model import Board
-from pips.solve.shell import Shell, SolverJobModel, SolverNodeModel, SolverResultModel, ResultStatus
+from pips.solve.shell import ResultStatus, Shell, SolverJobModel, SolverNodeModel, SolverResultModel
 
 logging.basicConfig(level=logging.INFO)
 
@@ -39,24 +39,29 @@ async def get_puzzle(puzzle_name) -> PuzzleModel:
 
 @app.get('/api/puzzles/{puzzle_name}/solverJob')
 async def get_solver_job(puzzle_name) -> SolverJobModel | None:
-    return shell.get_solver_job(puzzle_name)
+    return shell.puzzle(puzzle_name).get_solver_job()
 
 
 @app.post('/api/puzzles/{puzzle_name}/solverJob')
 async def start_solver_job(puzzle_name) -> SolverJobModel:
-    return shell.launch_solver(puzzle_name)
+    return shell.puzzle(puzzle_name).launch_solver()
 
 
 @app.get('/api/puzzles/{puzzle_name}/solverResult')
 async def get_solver_result(puzzle_name) -> SolverResultModel | None:
-    return shell.get_solver_result(puzzle_name)
+    return shell.puzzle(puzzle_name).get_solver_result()
 
 
 @app.get('/api/puzzles/{puzzle_name}/solverNodes/ids')
 async def get_solver_node_ids(puzzle_name) -> list[str]:
-    return shell.get_solver_node_ids(puzzle_name)
+    return shell.puzzle(puzzle_name).get_solver_node_ids()
 
 
 @app.get('/api/puzzles/{puzzle_name}/solverNodes/{node_id:path}')
 async def get_solver_node(puzzle_name, node_id) -> SolverNodeModel:
-    return shell.get_solver_node(puzzle_name, node_id)
+    return shell.puzzle(puzzle_name).get_solver_node(node_id)
+
+
+@app.post('/api/puzzles/{puzzle_name}/runOneStep')
+async def run_one_step(puzzle_name) -> SolverNodeModel | None:
+    return shell.puzzle(puzzle_name).run_one_step()

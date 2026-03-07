@@ -1,9 +1,10 @@
-import typing
+import functools
 import logging
 import os
 import re
 import subprocess
 import time
+import typing
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from threading import Thread
@@ -13,7 +14,10 @@ from pydantic import BaseModel
 
 from pips.app import models
 from pips.data.boardfromstr import read_board_from_string
-from pips.model import Board
+from pips.model import Board, BoardStatus, Domino, Location, Placement, Position
+
+from .node import Node
+from .solver import Solver
 
 logger = logging.getLogger('pips.solve.shell')
 
@@ -40,24 +44,24 @@ class SolverNodeModel(BaseModel):
 
 @dataclass
 class SolverJob:
-    shell: Shell
+    shell: 'PuzzleShell'
     model: SolverJobModel
 
     @property
     def file(self):
-        return self.shell._data_file(self.model.puzzle_name, 'solver')
+        return self.shell._data_file('solver')
 
     def save(self):
         with open(self.file, 'w') as fp:
             fp.write(self.model.model_dump_json(indent=2))
 
     @staticmethod
-    def start(shell: Shell, puzzle_name: str):
+    def start(shell: 'PuzzleShell'):
         solver_job = SolverJob(
             shell,
             SolverJobModel(
                 pid=-1,
-                puzzle_name=puzzle_name,
+                puzzle_name=shell._puzzle_name,
                 memory_usage_mb=0,
                 start_time=datetime.now(tz=UTC),
                 output=[],
@@ -105,7 +109,7 @@ class SolverJob:
 
     def run(self):
         popen = subprocess.Popen(
-            ['python', '-u', '-m', 'pips.cli.solveproc', self.shell.get_puzzle_file(self.model.puzzle_name)],
+            ['python', '-u', '-m', 'pips.cli.solveproc', self.shell.board_file],
             text=True,
             stderr=subprocess.STDOUT,
             stdout=subprocess.PIPE,
@@ -174,9 +178,9 @@ class SolverJob:
             ),
             solutions=self.parse_solutions(output),
         )
-        with open(self.shell._data_file(self.model.puzzle_name, 'result'), 'w') as fp:
+        with open(self.shell._data_file('result'), 'w') as fp:
             fp.write(result.model_dump_json(indent=2))
-        self.shell.set_result_status(self.model.puzzle_name, 'error' if result.error else 'solved' if result.solutions else 'no_solutions')
+        self.shell.set_result_status('error' if result.error else 'solved' if result.solutions else 'no_solutions')
         logger.info(f'Removing record of {self}')
         os.unlink(self.file)
 
@@ -192,11 +196,8 @@ class SolverResultModel(BaseModel):
 
 ResultStatus = typing.Literal['not_run', 'no_solutions', 'error', 'solved']
 
-FileSuffix: dict[str, ResultStatus] = {
-    'nos': 'no_solutions',
-    'err': 'error',
-    'sol': 'solved'
-}
+FileSuffix: dict[str, ResultStatus] = {'nos': 'no_solutions', 'err': 'error', 'sol': 'solved'}
+
 
 class Shell:
     def __init__(self, samples_dir: str, data_dir: str, exclude: set[str]):
@@ -204,18 +205,11 @@ class Shell:
         self.data_dir = data_dir
         self.exclude = exclude
 
-    # def get_file(self, puzzle_name: str, extension: str):
-    #     return os.path.join(self.samples_dir, f'{puzzle_name}.{extension}')
+    def puzzle(self, puzzle_name: str) -> PuzzleShell:
+        return PuzzleShell(self, puzzle_name)
 
     def set_result_status(self, puzzle_name, status: ResultStatus):
-        for suffix, test_status in FileSuffix.items():
-            file_path = self._data_file(puzzle_name, f'result.{suffix}')
-            exists = os.path.exists(file_path)
-            if exists and status != test_status:
-                os.unlink(file_path)
-            elif not exists and status == test_status:
-                with open(file_path, 'w'):
-                    pass
+        PuzzleShell(self, puzzle_name).set_result_status(status)
 
     def get_boards(self) -> dict[str, tuple[Board, ResultStatus]]:
         boards = {}
@@ -239,18 +233,73 @@ class Shell:
                 logger.exception(f'Failed to load puzzle {puzzle_file}')
         return boards
 
-    def get_puzzle_file(self, puzzle_name: str) -> str:
-        return os.path.join(self.samples_dir, f'{puzzle_name}.txt')
-
     def get_board(self, puzzle_name: str) -> Board:
-        with open(self.get_puzzle_file(puzzle_name)) as fp:
+        return PuzzleShell(self, puzzle_name).get_board()
+
+    def _data_file(self, *names: str):
+        return os.path.join(self.data_dir, *names)
+
+
+class ShellSolver(Solver):
+    def __init__(self, shell: 'PuzzleShell'):
+        super().__init__(shell.get_board())
+        self._shell = shell
+
+    def add_node(self, parent, placement):
+        new_state = [*parent.board.placements, placement]
+        node_id = '/'.join(f'{placement.brief}' for placement in new_state)
+        node = self._shell.get_solver_node(node_id)
+        if node:
+            return node.status, True
+
+        data_file = functools.partial(self._shell._data_file, 'nodes', node_id)
+        os.makedirs(data_file(), exist_ok=True)
+
+        node_model = SolverNodeModel(
+            puzzle_name=self._shell._puzzle_name,
+            id=str(node_id),
+            status='null',
+            placements=[
+                models.PlacementModel(domino=placement.domino, loc=placement.pos.loc, dir=placement.pos.dir.value.name)
+                for placement in new_state
+            ],
+        )
+
+        with open(data_file('state'), 'w') as fp:
+            fp.write(node_model.model_dump_json(indent=2))
+        with open(data_file('status=null'), 'w') as fp:
+            pass
+        return 'null', False
+
+
+class PuzzleShell:
+    def __init__(self, shell: Shell, puzzle_name: str):
+        self._shell = shell
+        self._puzzle_name = puzzle_name
+
+    @property
+    def board_file(self) -> str:
+        return os.path.join(self._shell.samples_dir, f'{self._puzzle_name}.txt')
+
+    def _data_file(self, *names: tuple[str, ...]):
+        return self._shell._data_file(self._puzzle_name, *names)
+
+    def set_result_status(self, status: ResultStatus):
+        for suffix, test_status in FileSuffix.items():
+            file_path = self._data_file(f'result.{suffix}')
+            exists = os.path.exists(file_path)
+            if exists and status != test_status:
+                os.unlink(file_path)
+            elif not exists and status == test_status:
+                with open(file_path, 'w'):
+                    pass
+
+    def get_board(self) -> Board:
+        with open(self.board_file) as fp:
             return read_board_from_string(fp.read())
 
-    def _data_file(self, puzzle_name: str, name: str):
-        return os.path.join(self.data_dir, puzzle_name, name)
-
-    def get_solver_job(self, puzzle_name: str) -> SolverJobModel | None:
-        path = self._data_file(puzzle_name, 'solver')
+    def get_solver_job(self) -> SolverJobModel | None:
+        path = self._data_file('solver')
         try:
             if os.path.exists(path):
                 with open(path) as fp:
@@ -260,8 +309,8 @@ class Shell:
             logger.exception(f'Unable to load solver job for {path}')
         return None
 
-    def get_solver_result(self, puzzle_name: str) -> SolverResultModel | None:
-        path = self._data_file(puzzle_name, 'result')
+    def get_solver_result(self) -> SolverResultModel | None:
+        path = self._data_file('result')
         try:
             if os.path.exists(path):
                 with open(path) as fp:
@@ -270,8 +319,8 @@ class Shell:
             logger.exception(f'Unable to load solver result for {path}')
         return None
 
-    def get_solver_node_ids(self, puzzle_name: str, status: str | None = None) -> list[str]:
-        nodes = self._data_file(puzzle_name, 'nodes/')
+    def get_solver_node_ids(self, status: str | None = None) -> list[str]:
+        nodes = self._data_file('nodes/')
         if not os.path.exists(nodes):
             return []
         status_filename = f'status={status}' if status else None
@@ -281,26 +330,56 @@ class Shell:
             if 'state' in filenames and (not status_filename or status_filename in filenames)
         ]
 
-    def get_solver_node(self, puzzle_name: str, node_id: str) -> SolverNodeModel | None:
-        node_path = self._data_file(puzzle_name, f'nodes/{node_id}/state')
+    def get_solver_node(self, node_id: str) -> SolverNodeModel | None:
+        node_path = self._data_file('nodes', node_id, 'state')
         if not os.path.exists(node_path):
             return None
         with open(node_path) as fp:
             return SolverNodeModel.model_validate_json(fp.read())
 
-    # def get_solvers(self) -> iter[SolverJobModel]:
-    #     for name, pid_file in self._list('.solver'):
-    #         try:
-    #             yield self.get_solver_job(name)
-    #         except Exception:
-    #             logger.exception(f'Could not load solver for name `{name}`, file `{pid_file}`')
-
-    def launch_solver(self, puzzle_name):
+    def launch_solver(self):
         try:
-            self.get_board(puzzle_name)
-            return SolverJob.start(self, puzzle_name).model
+            self.get_board()
+            return SolverJob.start(self._shell, self._puzzle_name).model
         except Exception as ex:
-            raise RuntimeError(f'Could not launch solver for {puzzle_name}') from ex
+            raise RuntimeError(f'Could not launch solver for {self._puzzle_name}') from ex
 
-    # def refresh_all_solvers(self):
-    #     pass
+    def _find_next_open_node(self) -> SolverNodeModel | None:
+        open_nodes = self.get_solver_node_ids('null')
+        if len(open_nodes) == 0:
+            return None
+        node_id = open_nodes[0]
+        logger.info(f'Found next start node id for {self._puzzle_name}: {node_id}')
+        return self.get_solver_node(node_id)
+
+    def _set_node_status(self, node: SolverNodeModel, status: BoardStatus):
+        # update the status of the start node
+        data_file = functools.partial(self._data_file, 'nodes', node.id)
+        old_status = data_file(f'status={node.status}')
+        new_status = data_file(f'status={status}')
+        state_file = data_file('state')
+        try:
+            os.unlink(old_status)
+        except IOError:
+            logger.error(f'Could not remove old status file: {old_status}')
+        node.status = status
+        with open(state_file, 'w') as fp:
+            fp.write(node.model_dump_json(indent=2))
+        with open(new_status, 'w') as fp:
+            pass
+        logger.debug(f'Upated start node {node.id} with status={node.status}')
+
+    def run_one_step(self) -> SolverNodeModel | None:
+        start_node = self._find_next_open_node()
+        if not start_node and os.path.exists(self._data_file('nodes')):
+            return None
+
+        board = self.get_board()
+        if start_node:
+            for placement in start_node.placements:
+                board.place(Placement(Domino(*placement.domino), Position(Location(*placement.loc), placement.dir)))
+
+        solver = ShellSolver(self)
+        node = Node(board)
+        node.expand(solver, solver)
+        self._set_node_status(start_node, node.status)
