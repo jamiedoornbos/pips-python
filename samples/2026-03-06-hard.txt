@@ -1,0 +1,32 @@
+
+      # Title
+        2026-03-06-hard
+      # Background
+        A...B.@
+        A...B.C
+        A.D.B.C
+        EEEFF.C
+        .L.@...
+        .......
+        .G..H..
+        .I..J..
+        .IK.JJ.
+      # Constraints
+        A: eq 15
+        B: match
+        C: eq 1
+        D: eq 3
+        E: match
+        F: eq 12
+        G: eq 4
+        H: gt 3
+        I: eq 4
+        J: eq 7
+        K: lt 4
+        L: gt 3
+      # Dominoes
+        62 03 55 43
+        16 33 54 36
+        00 31 06 11
+        40
+    
