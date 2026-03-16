@@ -31,6 +31,10 @@ class Solver(SolverCaches, SolverDebug):
             for tile in constraint.tiles:
                 self._constraint_map[tile] = constraint
 
+    @property
+    def board(self):
+        return self._nodes[()].board
+
     def open_count_by_depth(self) -> list[int]:
         return [len(tier) for tier in self._open]
 

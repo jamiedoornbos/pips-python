@@ -2,7 +2,9 @@ import functools
 import logging
 import os
 import re
+import shutil
 import subprocess
+import threading
 import time
 import typing
 from dataclasses import dataclass
@@ -10,7 +12,7 @@ from datetime import UTC, datetime, timedelta
 from threading import Thread
 
 import psutil
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from pips.app import models
 from pips.data.boardfromstr import read_board_from_string
@@ -25,6 +27,14 @@ logger = logging.getLogger('pips.solve.shell')
 PLACEMENT = re.compile(
     r'^  (?P<left>\d)(?P<right>\d) at \((?P<x>\d+), (?P<y>\d+)\) facing (?P<dir>north|south|east|west)'
 )
+
+
+class BackgroundSolveModel(BaseModel):
+    thread: str
+    iterations: int
+    start_time: datetime
+    output: list[str]
+    is_running: typing.Annotated[bool, Field(default=False)]
 
 
 class SolverJobModel(BaseModel):
@@ -167,6 +177,7 @@ class SolverJob:
         result = SolverResultModel(
             puzzle_name=self.model.puzzle_name,
             peak_memory_usage_mb=peak_memory_usage,
+            iterations=0,
             time_to_solve=completion_time - self.model.start_time,
             completion_time=completion_time,
             error=(
@@ -188,6 +199,7 @@ class SolverJob:
 class SolverResultModel(BaseModel):
     puzzle_name: str
     peak_memory_usage_mb: float
+    iterations: int
     time_to_solve: timedelta
     completion_time: datetime
     error: str | None
@@ -207,9 +219,6 @@ class Shell:
 
     def puzzle(self, puzzle_name: str) -> PuzzleShell:
         return PuzzleShell(self, puzzle_name)
-
-    def set_result_status(self, puzzle_name, status: ResultStatus):
-        PuzzleShell(self, puzzle_name).set_result_status(status)
 
     def get_boards(self) -> dict[str, tuple[Board, ResultStatus]]:
         boards = {}
@@ -244,6 +253,13 @@ class ShellSolver(Solver):
     def __init__(self, shell: 'PuzzleShell'):
         super().__init__(shell.get_board())
         self._shell = shell
+        self._opened: list[str] = shell.get_solver_node_ids('null')
+
+    def pop_open(self) -> str | None:
+        self._opened.sort(key=len, reverse=True)
+        if not self._opened:
+            return None
+        return self._opened.pop()
 
     def add_node(self, parent, placement):
         new_state = [*parent.board.placements, placement]
@@ -257,7 +273,7 @@ class ShellSolver(Solver):
 
         node_model = SolverNodeModel(
             puzzle_name=self._shell._puzzle_name,
-            id=str(node_id),
+            id=node_id,
             status='null',
             placements=[
                 models.PlacementModel(domino=placement.domino, loc=placement.pos.loc, dir=placement.pos.dir.value.name)
@@ -269,6 +285,7 @@ class ShellSolver(Solver):
             fp.write(node_model.model_dump_json(indent=2))
         with open(data_file('status=null'), 'w') as fp:
             pass
+        self._opened.append(node_id)
         return 'null', False
 
 
@@ -298,13 +315,12 @@ class PuzzleShell:
         with open(self.board_file) as fp:
             return read_board_from_string(fp.read())
 
-    def get_solver_job(self) -> SolverJobModel | None:
-        path = self._data_file('solver')
+    def get_solver_job(self) -> BackgroundSolveModel | None:
+        path = self._data_file('nodes', 'bgsolve')
         try:
             if os.path.exists(path):
                 with open(path) as fp:
-                    job = SolverJobModel.model_validate_json(fp.read())
-                    return job if psutil.pid_exists(job.pid) else None
+                    return BackgroundSolveModel.model_validate_json(fp.read())
         except Exception:
             logger.exception(f'Unable to load solver job for {path}')
         return None
@@ -318,6 +334,12 @@ class PuzzleShell:
         except Exception:
             logger.exception(f'Unable to load solver result for {path}')
         return None
+
+    def has_any_nodes(self) -> bool:
+        for _, _, filenames in os.walk(self._data_file('nodes/')):
+            if 'state' in filenames:
+                return True
+        return False
 
     def get_solver_node_ids(self, status: str | None = None) -> list[str]:
         nodes = self._data_file('nodes/')
@@ -337,6 +359,91 @@ class PuzzleShell:
         with open(node_path) as fp:
             return SolverNodeModel.model_validate_json(fp.read())
 
+    def init_background_solve(self) -> BackgroundSolveModel:
+        lock_file = self._data_file('nodes', 'bgsolve.lock')
+        os.makedirs(os.path.dirname(lock_file), exist_ok=True)
+        with open(lock_file, 'x'):
+            pass
+
+        job = self._load_bg_job() or BackgroundSolveModel(
+            thread=threading.current_thread().name,
+            iterations=0,
+            start_time=datetime.now(tz=UTC),
+            is_running=True,
+            output=[],
+        )
+
+        job.is_running = True
+        self._save_bg_job(job)
+        return job
+
+    def _load_bg_job(self) -> BackgroundSolveModel | None:
+        job_path = self._data_file('nodes', 'bgsolve')
+        if not os.path.exists(job_path):
+            return None
+
+        with open(job_path) as fp:
+            return BackgroundSolveModel.model_validate_json(fp.read())
+
+    def _save_bg_job(self, job: BackgroundSolveModel):
+        job_path = self._data_file('nodes', 'bgsolve')
+        temp_path = f'{job_path}.tmp'
+        os.makedirs(os.path.dirname(job_path), exist_ok=True)
+        with open(temp_path, 'w') as fp:
+            fp.write(job.model_dump_json(indent=2))
+        os.replace(temp_path, job_path)
+
+    def background_solve(self, shutdown_event: threading.Event):
+        try:
+            self._background_solve(shutdown_event)
+        finally:
+            os.unlink(self._data_file('nodes', 'bgsolve.lock'))
+            job = self._load_bg_job()
+            if job:
+                job.is_running = False
+                self._save_bg_job(job)
+
+    def _background_solve(self, shutdown_event: threading.Event):
+        job = self._load_bg_job()
+        job.thread = threading.current_thread().name
+        solutions = [
+            node.placements for node in [self.get_solver_node(node_id) for node_id in (self.get_solver_node_ids('won'))]
+        ]
+        logger.info(
+            f'Starting background solve for {self._puzzle_name} thread {job.thread}, {len(solutions)} solutions so far'
+        )
+
+        try:
+            while True:
+                if shutdown_event.is_set():
+                    return
+                more_solutions, finished = self.run_steps(job, 100)
+                solutions.extend(more_solutions)
+                if finished:
+                    break
+            error = None
+        except Exception as ex:
+            error = str(ex)
+
+        completion_time = datetime.now(tz=UTC)
+        result = SolverResultModel(
+            puzzle_name=self._puzzle_name,
+            peak_memory_usage_mb=0,
+            iterations=job.iterations,
+            time_to_solve=completion_time - job.start_time,
+            completion_time=completion_time,
+            error=error,
+            solutions=solutions,
+        )
+        with open(self._data_file('result'), 'w') as fp:
+            fp.write(result.model_dump_json(indent=2))
+        self.set_result_status('error' if error else 'solved' if solutions else 'no_solutions')
+        os.unlink(self._data_file('nodes', 'bgsolve'))
+        logger.info(f'Finished background solve for {self._puzzle_name} after {job.iterations} iterations')
+
+    def reset_background_solver(self):
+        shutil.rmtree(self._data_file('nodes'))
+
     def launch_solver(self):
         try:
             self.get_board()
@@ -348,9 +455,7 @@ class PuzzleShell:
         open_nodes = self.get_solver_node_ids('null')
         if len(open_nodes) == 0:
             return None
-        node_id = open_nodes[0]
-        logger.info(f'Found next start node id for {self._puzzle_name}: {node_id}')
-        return self.get_solver_node(node_id)
+        return self.get_solver_node(open_nodes[0])
 
     def _set_node_status(self, node: SolverNodeModel, status: BoardStatus):
         # update the status of the start node
@@ -369,17 +474,46 @@ class PuzzleShell:
             pass
         logger.debug(f'Upated start node {node.id} with status={node.status}')
 
-    def run_one_step(self) -> SolverNodeModel | None:
-        start_node = self._find_next_open_node()
-        if not start_node and os.path.exists(self._data_file('nodes')):
-            return None
-
-        board = self.get_board()
-        if start_node:
-            for placement in start_node.placements:
-                board.place(Placement(Domino(*placement.domino), Position(Location(*placement.loc), placement.dir)))
-
+    def run_steps(self, job: BackgroundSolveModel, count: int) -> bool:
         solver = ShellSolver(self)
-        node = Node(board)
-        node.expand(solver, solver)
-        self._set_node_status(start_node, node.status)
+        current_node_id = solver.pop_open()
+        save_node = True
+        if not current_node_id:
+            if self.has_any_nodes():
+                return [], True
+            current_node = SolverNodeModel(puzzle_name=self._puzzle_name, id='', status='incomplete', placements=[])
+            save_node = False
+        else:
+            current_node = self.get_solver_node(current_node_id)
+
+        # board = self.get_board()
+        # start_node = self._find_next_open_node()
+        # save_start_node = True
+        # if not start_node:
+        #     if self.has_any_nodes():
+        #         return None
+        #     start_node = SolverNodeModel(puzzle_name=self._puzzle_name, id='', status='incomplete', placements=[])
+        #     save_start_node = False
+        # for placement in start_node.placements:
+        #     board.place(Placement(Domino(*placement.domino), Position(Location(*placement.loc), placement.dir)))
+
+        # solver = ShellSolver(self)
+        new_solutions = []
+        for _ in range(count):
+            board = solver.board.copy(reset=False)
+            for placement in current_node.placements:
+                board.place(Placement(Domino(*placement.domino), Position(Location(*placement.loc), placement.dir)))
+            node = Node(board)
+            node.expand(solver, solver)
+            if save_node:
+                self._set_node_status(current_node, node.status)
+            if node.status == 'won':
+                new_solutions.append(current_node.placements)
+            job.iterations += 1
+            self._save_bg_job(job)
+            if not (current_node_id := solver.pop_open()):
+                break
+            current_node = self.get_solver_node(current_node_id)
+            save_node = True
+
+        return new_solutions, current_node_id is None
