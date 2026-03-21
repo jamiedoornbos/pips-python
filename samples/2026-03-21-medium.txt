@@ -1,0 +1,19 @@
+
+      # Title
+        2026-03-21-medium
+      # Background
+        .AA.
+        BBBB
+        CDEF
+        C.EF
+        G...
+      # Constraints
+        A: gt 0
+        B: match
+        C: eq 5
+        D: lt 3
+        E: eq 1
+        F: eq 4
+        G: gt 1
+      # Dominoes
+        00 21 20 44 22 04 01
