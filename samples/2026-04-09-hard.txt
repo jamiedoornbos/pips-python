@@ -1,0 +1,30 @@
+
+      # Title
+        2026-04-09-hard
+      # Background
+        AABCD
+        E...D
+        E.FFG
+        H...G
+        H.IJJ
+        K...J
+        LMNOO
+      # Constraints
+        A: match
+        B: gt 3
+        C: eq 3
+        D: match
+        E: match
+        F: match
+        G: eq 3
+        H: eq 3
+        I: gt 3
+        J: eq 3
+        K: gt 3
+        L: gt 3
+        M: gt 3
+        N: lt 3
+        O: eq 3
+      # Dominoes
+        01 52 31 60 34 50 33 26 15 32 44 36
+    

@@ -1,0 +1,25 @@
+
+      # Title
+        2026-03-29-hard
+      # Background
+        AAABBCC
+        D.A...E
+        @.F.G.H
+        @.F.G.H
+        I.F...H
+        IJKLLLL
+      # Constraints
+        A: match
+        B: match
+        C: eq 10
+        D: eq 1
+        E: eq 0
+        F: match
+        G: eq 10
+        H: eq 10
+        I: gt 10
+        J: eq 1
+        K: eq 1
+        L: match
+      # Dominoes
+        02 61 45 00 25 01 46 40 66 41 55 22 44 56

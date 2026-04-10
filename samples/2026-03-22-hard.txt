@@ -1,0 +1,37 @@
+
+      # Title
+        2026-03-22-hard
+      # Background
+        .ABCDEF
+        .G@HIJK
+        .L@MNO@
+        PQRS@T@
+        ..UV@WX
+      # Constraints
+        A: eq 2
+        B: eq 3
+        C: eq 3
+        D: eq 2
+        E: eq 0
+        F: eq 4
+        G: eq 2
+        H: eq 0
+        I: eq 4
+        J: eq 3
+        K: eq 3
+        L: eq 3
+        M: eq 0
+        N: eq 0
+        O: eq 0
+        P: eq 2
+        Q: eq 3
+        R: eq 0
+        S: eq 2
+        T: eq 4
+        U: eq 4
+        V: eq 2
+        W: eq 4
+        X: eq 4
+      # Dominoes
+        22 33 10 24 03 43
+        23 31 04 02 21 00 14 11 44

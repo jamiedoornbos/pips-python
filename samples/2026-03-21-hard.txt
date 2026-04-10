@@ -1,0 +1,26 @@
+
+      # Title
+        2026-03-21-hard
+      # Background
+        AA@.BBB..
+        ..@...@.C
+        .DE.FFF.G
+        ..E.H...G
+        IJE.@KLMM
+      # Constraints
+        A: eq 5
+        B: eq 5
+        C: gt 5
+        D: gt 5
+        E: eq 5
+        F: eq 5
+        G: eq 5
+        H: eq 5
+        I: eq 5
+        J: eq 5
+        K: eq 5
+        L: eq 5
+        M: match
+      # Dominoes
+        50 32 55 63 01 52 31 00 14 16 15 11 21
+    

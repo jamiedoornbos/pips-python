@@ -1,0 +1,28 @@
+20
+
+      # Title
+        2026-03-18-hard
+      # Background
+        ..A...@
+        ..B...C
+        ..BDEEC
+        ..B.@.C
+        ..BFGGG
+        ...FIG.
+        ....I..
+        @.JKI@.
+        @JJKIM.
+      # Constraints
+        A: eq 5
+        B: eq 4
+        C: eq 11
+        D: eq 3
+        E: eq 10
+        F: eq 9
+        G: eq 24
+        I: eq 0
+        J: eq 10
+        K: eq 10
+        M: eq 3
+      # Dominoes
+        31 65 11 40 53 22 15 66 42 63 45 32 50 43 00 52
