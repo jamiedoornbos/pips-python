@@ -231,8 +231,11 @@ class Shell:
             if name in self.exclude:
                 continue
             try:
-                with open(puzzle_file) as fp:
-                    board = read_board_from_string(fp.read())
+                try:
+                    with open(puzzle_file) as fp:
+                        board = read_board_from_string(fp.read())
+                except Exception as ex:
+                    raise ValueError(f'Could not load puzzle_file {puzzle_file}') from ex
                 status: ResultStatus = 'not_run'
                 for suffix, test_status in FileSuffix.items():
                     if os.path.exists(self._data_file(name, f'result.{suffix}')):
