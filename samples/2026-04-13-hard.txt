@@ -1,0 +1,21 @@
+
+      # Title
+        2026-MM-DD-hard
+      # Background
+        AABBC
+        D...C
+        D...E
+        F...E
+        FGGHH
+      # Constraints
+        A: eq 2
+        B: eq 9
+        C: match
+        D: eq 9
+        E: gt 9
+        F: lt 3
+        G: match
+        H: match
+      # Dominoes
+        46 41 25 03 12 60 42 05
+    

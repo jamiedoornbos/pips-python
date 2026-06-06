@@ -1,0 +1,23 @@
+      # Title
+        2026-04-17-hard
+      # Background
+        ABBC...
+        D..C...
+        D..EEFF
+        GHHE..I
+        ...E..I
+        ...JJKK
+      # Constraints
+        A: eq 5
+        B: match
+        C: eq 5
+        D: lt 3
+        E: notMatch
+        F: eq 10
+        G: eq 4
+        H: eq 8
+        I: eq 2
+        J: lt 2
+        K: eq 6
+      # Dominoes
+        51 40 65 21 45 33 25 11 42 05 14

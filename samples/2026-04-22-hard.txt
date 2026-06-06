@@ -1,0 +1,23 @@
+
+      # Title
+        2026-04-22-hard
+      # Background
+        AAB....
+        C.BBD..
+        C@E.DFG
+        ..EHI.G
+        ....IJG
+      # Constraints
+        A: match
+        B: match
+        C: match
+        D: lt 2
+        E: match
+        F: gt 2
+        G: match
+        H: gt 2
+        I: match
+        J: gt 2
+      # Dominoes
+        01 23 60 34 16 35 02 46 22 30
+    

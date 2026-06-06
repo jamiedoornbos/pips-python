@@ -1,0 +1,43 @@
+
+      # Title
+        2026-05-21-hard
+      # Background
+        ABCDEF
+        GHIJKK
+        LMNOPQ
+        RSTUVW
+        @@XYZa
+      # Constraints
+        A: eq 0
+        B: eq 2
+        C: eq 1
+        D: eq 5
+        E: eq 4
+        F: eq 5
+        G: eq 4
+        H: eq 4
+        I: eq 3
+        J: eq 0
+        K: match
+        L: eq 2
+        M: eq 2
+        N: eq 0
+        O: eq 1
+        P: eq 4
+        Q: eq 0
+        R: eq 0
+        S: eq 3
+        T: eq 2
+        U: eq 4
+        V: eq 1
+        W: eq 2
+        X: eq 1
+        Y: eq 5
+        Z: eq 1
+        a: eq 5
+      # Dominoes
+        01 02 03 04 05
+        12 13 14 15
+        23 24 25
+        34 35
+        45

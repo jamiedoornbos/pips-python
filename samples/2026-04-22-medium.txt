@@ -1,0 +1,17 @@
+
+      # Title
+        2026-04-22-medium
+      # Background
+        AABB
+        CDDE
+        FGGE
+      # Constraints
+        A: match
+        B: match
+        C: lt 3
+        D: eq 4
+        E: match
+        F: gt 4
+        G: eq 4
+      # Dominoes
+        20 14 53 40 21 44

@@ -1,0 +1,30 @@
+
+      # Title
+        2026-04-20-hard
+      # Background
+        AAB@CD
+        E.FG.D
+        EHHHIJ
+        EKHHJJ
+        L.HH.M
+        LNOPPM
+      # Constraints
+        A: eq 1
+        B: gt 1
+        C: eq 0
+        D: eq 2
+        E: match
+        F: gt 1
+        G: gt 1
+        H: notMatch
+        I: eq 2
+        J: eq 12
+        K: eq 0
+        L: eq 7
+        M: eq 0
+        N: gt 3
+        O: gt 4
+        P: eq 12
+      # Dominoes
+        41 06 22 43 12 03 61 33 62 00 24 01 44 13 04 55
+    
