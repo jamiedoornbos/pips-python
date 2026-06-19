@@ -1,0 +1,28 @@
+      # Title
+        2026-06-16-hard
+      # Background
+        @AAAB....
+        ..A......
+        ..A.@...@
+        ..C.D...J
+        ....D.F.I
+        KKK.EEEHH
+        K.N..G.@.
+        LMM......
+      # Constraints
+        A: match
+        B: lt 2
+        C: eq 2
+        D: match
+        E: match
+        F: gt 2
+        G: eq 2
+        H: match
+        I: eq 2
+        J: eq 2
+        K: eq 22
+        L: lt 2
+        M: match
+        N: eq 2
+      # Dominoes
+        20 51 03 25 66 41 53 00 26 40 21 60 42 01 22
