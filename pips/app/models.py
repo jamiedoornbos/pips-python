@@ -2,11 +2,11 @@ from typing import Annotated
 
 from pydantic import BaseModel, BeforeValidator, Field, field_serializer
 
-from pips.model import ConstraintType, Domino, Location, Orientation
+from pips.model import Board, Constraint, ConstraintType, Domino, Location, LocationSet, Orientation
 
 
 class ConstraintModel(BaseModel):
-    tiles: list
+    tiles: list[Location]
     type: ConstraintType
     value: int | None
 
@@ -16,9 +16,18 @@ class ConstraintModel(BaseModel):
 
 
 class PuzzleModel(BaseModel):
-    background: list
+    background: list[Location]
     constraints: list[ConstraintModel]
     all_dominoes: Annotated[list[Domino], Field(serialization_alias='dominoes')]
+
+    def to_board(self) -> Board:
+        return Board(
+            background=LocationSet(self.background),
+            constraints=tuple(
+                Constraint(tiles=LocationSet(c.tiles), type=c.type, value=c.value) for c in self.constraints
+            ),
+            dominoes=tuple(self.all_dominoes),
+        )
 
 
 class PlacementModel(BaseModel):

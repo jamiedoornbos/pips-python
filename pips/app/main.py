@@ -1,11 +1,15 @@
 import logging
 import threading
 from contextlib import asynccontextmanager
+from typing import Annotated
 
 import cachetools
-from fastapi import BackgroundTasks, FastAPI, HTTPException
+import sqlalchemy as sa
+from fastapi import BackgroundTasks, Body, Depends, FastAPI, HTTPException
 
 from pips.app.models import PuzzleModel
+from pips.db.puzzles import load_puzzle_titles, puzzle_to_board, save_new_puzzle
+from pips.db.session import AsyncSession, get_session
 from pips.model import Board
 from pips.solve.shell import BackgroundSolveModel, ResultStatus, Shell, SolverNodeModel, SolverResultModel
 
@@ -36,8 +40,9 @@ async def root():
 
 
 @app.get('/api/puzzleNames')
-async def get_puzzle_names() -> list[tuple[str, ResultStatus]]:
-    return [(name, board[1]) for name, board in cache().items()]
+async def get_puzzle_names(session: AsyncSession = Depends(get_session)) -> list[tuple[str, ResultStatus]]:
+    titles = await load_puzzle_titles(session)
+    return [(title, 'not_run') for title in titles]
 
 
 @app.get('/api/puzzles/{puzzle_name}')
@@ -83,3 +88,16 @@ async def get_won_node_ids(puzzle_name) -> list[str]:
 @app.get('/api/puzzles/{puzzle_name}/solverNodes/{node_id:path}')
 async def get_solver_node(puzzle_name, node_id) -> SolverNodeModel:
     return shell.puzzle(puzzle_name).get_solver_node(node_id)
+
+
+@app.get('/api/test-select')
+async def test_select(session: AsyncSession = Depends(get_session)):
+    result = list(await session.execute(sa.select(sa.literal(1))))
+    return {'result': result[0][0]}
+
+
+@app.post('/api/puzzles')
+async def create_puzzle(
+    title: Annotated[str, Body()], puzzle: PuzzleModel, session: AsyncSession = Depends(get_session)
+) -> PuzzleModel:
+    return await save_new_puzzle(session, title, puzzle.to_board())
