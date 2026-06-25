@@ -1,0 +1,10 @@
+services:
+  db:
+    image: postgres:17
+    env_file:
+      - ./.env
+    restart: unless-stopped
+    ports:
+      - "9432:5432"
+    volumes:
+      - ./local-data/postgresql:/var/lib/postgresql/data

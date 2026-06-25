@@ -10,3 +10,4 @@ wheels/
 .venv
 
 local-data/
+.env
