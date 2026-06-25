@@ -1,0 +1,38 @@
+
+      # Title
+        2026-06-20-hard
+      # Background
+        BBA.....
+        C......Q
+        CDD.RR.P
+        ..E....P
+        ..E....O
+        GFF.....
+        .....K.N
+        ..HI.L.N
+        .....LMN
+        ..JJ...@
+
+      # Constraints
+        A: lt 3
+        B: match
+        C: eq 1
+        D: eq 11
+        E: eq 5
+        F: eq 10
+        G: lt 3
+        H: gt 2
+        I: lt 2
+        J: gt 9
+        K: gt 4
+        L: gt 10
+        M: eq 1
+        N: match
+        O: lt 3
+        P: eq 1
+        Q: gt 3
+        R: eq 7
+
+      # Dominoes
+        32 06 52 03 61 45 31 46 33 40 26 14 66 21 36
+    
