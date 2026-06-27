@@ -8,7 +8,7 @@ import sqlalchemy as sa
 from fastapi import BackgroundTasks, Body, Depends, FastAPI, HTTPException
 
 from pips.app.models import PuzzleModel
-from pips.db.puzzles import load_puzzle_titles, puzzle_to_board, save_new_puzzle
+from pips.db.puzzles import load_puzzle, load_puzzle_titles, save_new_puzzle
 from pips.db.session import AsyncSession, get_session
 from pips.model import Board
 from pips.solve.shell import BackgroundSolveModel, ResultStatus, Shell, SolverNodeModel, SolverResultModel
@@ -46,9 +46,8 @@ async def get_puzzle_names(session: AsyncSession = Depends(get_session)) -> list
 
 
 @app.get('/api/puzzles/{puzzle_name}')
-async def get_puzzle(puzzle_name) -> PuzzleModel:
-    board, status = cache().get(puzzle_name)
-    if not board:
+async def get_puzzle(puzzle_name, session: AsyncSession = Depends(get_session)) -> PuzzleModel:
+    if not (board := await load_puzzle(session, puzzle_name)):
         raise HTTPException(404, 'Puzzle not found')
     return board
 
