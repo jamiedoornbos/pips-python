@@ -7,12 +7,8 @@ from pips.model import Board, Constraint, ConstraintType, Domino, Location, Loca
 
 class ConstraintModel(BaseModel):
     tiles: list[Location]
-    type: ConstraintType
+    type: Annotated[str, BeforeValidator(lambda t: t.value.name if isinstance(t, ConstraintType) else t)]
     value: int | None
-
-    @field_serializer('type')
-    def serialize_type(self, type: ConstraintType, _info):
-        return type.value.name
 
 
 class PuzzleModel(BaseModel):
@@ -24,7 +20,8 @@ class PuzzleModel(BaseModel):
         return Board(
             background=LocationSet(self.background),
             constraints=tuple(
-                Constraint(tiles=LocationSet(c.tiles), type=c.type, value=c.value) for c in self.constraints
+                Constraint(tiles=LocationSet(c.tiles), type=ConstraintType.from_name(c.type), value=c.value)
+                for c in self.constraints
             ),
             dominoes=tuple(self.all_dominoes),
         )
