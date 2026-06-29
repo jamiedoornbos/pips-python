@@ -2,12 +2,18 @@ import hashlib
 import struct
 import typing
 
+from fastapi import Depends
 from sqlalchemy import Select, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import aliased
 
-from pips.db.model.puzzle import Puzzle, PuzzleState
+from pips.db import Puzzle, PuzzleState
+from pips.db.session import get_session
 from pips.model import Board, Constraint, Domino, Location, LocationSet, Orientation, Placement, Position
+
+_ORIENTATION_INTS = {Orientation.EAST: 0, Orientation.SOUTH: 1, Orientation.WEST: 2, Orientation.NORTH: 3}
+
+_INT_ORIENTATIONS = {value: key for key, value in _ORIENTATION_INTS.items()}
 
 
 def _loc_to_int(loc: Location) -> int:
@@ -48,33 +54,29 @@ def _board_to_puzzle(board: Board, puzzle: Puzzle):
     puzzle.dominoes = [_domino_to_int(domino) for domino in board.all_dominoes]
 
 
-async def save_new_puzzle(session: AsyncSession, title: str, board: Board) -> Board:
-    puzzle = Puzzle(title=title, version=0)
-    _board_to_puzzle(board, puzzle)
-    session.add(puzzle)
-    await session.commit()
-    return _puzzle_to_board(puzzle)
-
-
-async def update_puzzle(session: AsyncSession, title: str, board: Board) -> tuple[Board, int]:
-    puzzle = Puzzle(
-        title=title,
-        version=session.execute(select(func.max(Puzzle.version)).where(Puzzle.title == title)).scalars().one() + 1,
+def _puzzle_to_board(puzzle: Puzzle) -> Board:
+    return Board(
+        LocationSet(_int_to_loc(loc) for loc in puzzle.background),
+        tuple(
+            Constraint(LocationSet(_int_to_loc(loc) for loc in con['tiles']), con['type'], con['value'])
+            for con in puzzle.constraints
+        ),
+        [_int_to_domino(dom) for dom in puzzle.dominoes],
     )
-    _board_to_puzzle(board, puzzle)
-    session.add(puzzle)
-    await session.commit()
-    return _puzzle_to_board(puzzle), puzzle.version
 
 
-async def load_puzzle(session: AsyncSession, title: str, version: int | None = None) -> Board:
-    if version is not None:
-        puzzle = await session.get(Puzzle, (title, version))
-    else:
-        query, LatestPuzzle = _latest_versions()
-        query = query.where(LatestPuzzle.title == title)
-        puzzle = (await session.execute(query)).scalars().first()
-    return _puzzle_to_board(puzzle)
+def _placement_to_int(placement: Placement) -> int:
+    loc = _loc_to_int(placement.pos.loc)  # 14 bits
+    orientation = _ORIENTATION_INTS[placement.pos.dir]  # 2 bits
+    domino = _domino_to_int(placement.domino)  # 8 bits
+    return (loc) | (orientation << 14) | (domino << 16)
+
+
+def _int_to_placement(pl: int) -> Placement:
+    loc = _int_to_loc(pl & 0x3FFF)
+    orientation = _INT_ORIENTATIONS[(pl >> 14) & 0x3]
+    domino = _int_to_domino(pl >> 16)
+    return Placement(domino, Position(loc, orientation))
 
 
 def _latest_versions() -> tuple[Select, type[Puzzle]]:
@@ -93,65 +95,91 @@ def _latest_versions() -> tuple[Select, type[Puzzle]]:
     return select(LatestPuzzle).where(ranked.c.row == 1), LatestPuzzle
 
 
-async def load_puzzle_titles(session: AsyncSession) -> list[str]:
-    stmt, LatestPuzzle = _latest_versions()
-    stmt = stmt.with_only_columns(LatestPuzzle.title).order_by(LatestPuzzle.created_at)
-    return (await session.execute(stmt)).scalars().all()
+class CatalogShell:
+    def __init__(self, session: AsyncSession = Depends(get_session)):
+        self.session = session
+
+    def puzzle(self, title: str) -> PuzzleShell:
+        return PuzzleShell(self, title)
+
+    async def load_puzzle_titles(self) -> list[str]:
+        stmt, LatestPuzzle = _latest_versions()
+        stmt = stmt.with_only_columns(LatestPuzzle.title).order_by(LatestPuzzle.created_at.desc())
+        return (await self.session.execute(stmt)).scalars().all()
 
 
-def _puzzle_to_board(puzzle: Puzzle) -> Board:
-    return Board(
-        LocationSet(_int_to_loc(loc) for loc in puzzle.background),
-        tuple(
-            Constraint(LocationSet(_int_to_loc(loc) for loc in con['tiles']), con['type'], con['value'])
-            for con in puzzle.constraints
-        ),
-        [_int_to_domino(dom) for dom in puzzle.dominoes],
-    )
+class PuzzleShell:
+    def __init__(self, catalog: CatalogShell, title: str):
+        self.catalog = catalog
+        self.title = title
+
+    @property
+    def session(self) -> AsyncSession:
+        return self.catalog.session
+
+    def version(self, version: int) -> PuzzleVersionShell:
+        return PuzzleVersionShell(self, version)
+
+    async def load(self, version: int | None = None) -> Board:
+        if version is not None:
+            puzzle = await self.session.get(Puzzle, (self.title, version))
+        else:
+            query, LatestPuzzle = _latest_versions()
+            query = query.where(LatestPuzzle.title == self.title)
+            puzzle = (await self.session.execute(query)).scalars().first()
+        return _puzzle_to_board(puzzle)
+
+    async def save_new(self, board: Board) -> Board:
+        puzzle = Puzzle(title=self.title, version=0)
+        _board_to_puzzle(board, puzzle)
+        self.session.add(puzzle)
+        await self.session.commit()
+        return _puzzle_to_board(puzzle)
+
+    async def update(self, board: Board) -> tuple[Board, int]:
+        version_query = select(func.max(Puzzle.version)).where(Puzzle.title == self.title)
+        puzzle = Puzzle(
+            title=self.title,
+            version=(await self.session.scalar(version_query)) + 1,
+        )
+        _board_to_puzzle(board, puzzle)
+        self.session.add(puzzle)
+        await self.session.commit()
+        return _puzzle_to_board(puzzle), puzzle.version
 
 
-_ORIENTATION_INTS = {Orientation.EAST: 0, Orientation.SOUTH: 1, Orientation.WEST: 2, Orientation.NORTH: 3}
+class PuzzleVersionShell:
+    def __init__(self, puzzle: PuzzleShell, version: int):
+        self.puzzle = puzzle
+        self.version = version
 
-_INT_ORIENTATIONS = {value: key for key, value in _ORIENTATION_INTS.items()}
+    @property
+    def session(self) -> AsyncSession:
+        return self.puzzle.session
 
-
-def _placement_to_int(placement: Placement) -> int:
-    loc = _loc_to_int(placement.pos.loc)  # 14 bits
-    orientation = _ORIENTATION_INTS[placement.pos.dir]  # 2 bits
-    domino = _domino_to_int(placement.domino)  # 8 bits
-    return (loc) | (orientation << 14) | (domino << 16)
-
-
-def _int_to_placement(pl: int) -> Placement:
-    loc = _int_to_loc(pl & 0x3FFF)
-    orientation = _INT_ORIENTATIONS[(pl >> 14) & 0x3]
-    domino = _int_to_domino(pl >> 16)
-    return Placement(domino, Position(loc, orientation))
-
-
-async def upsert_board(session: AsyncSession, title: str, version: int, board: Board) -> tuple[int, bool]:
-    """Inserts the board and returns True if it is new."""
-    if not len(board.placements):
-        raise ValueError('Board has no placements')
-    placements = [_placement_to_int(placement) for placement in board.placements]
-    placements.sort()
-    hash_ = hashlib.sha256(struct.pack(f'{len(placements)}i', *placements)).hexdigest()
-    for state in (
-        (
-            await session.execute(
-                select(PuzzleState).where(
-                    PuzzleState.puzzle_title == title,
-                    PuzzleState.puzzle_version == version,
-                    PuzzleState.placements_hash == hash_,
+    async def upsert_board(self, board: Board) -> tuple[int, bool]:
+        """Inserts the board and returns True if it is new."""
+        if not len(board.placements):
+            raise ValueError('Board has no placements')
+        placements = [_placement_to_int(placement) for placement in board.placements]
+        placements.sort()
+        hash_ = hashlib.sha256(struct.pack(f'{len(placements)}i', *placements)).hexdigest()
+        for state in (
+            (
+                await self.session.execute(
+                    select(PuzzleState).where(
+                        PuzzleState.puzzle_title == self.puzzle.title,
+                        PuzzleState.puzzle_version == self.version,
+                        PuzzleState.placements_hash == hash_,
+                    )
                 )
             )
-        )
-        .scalars()
-        .all()
-    ):
-        if state.placements == placements:
-            return state.id, True
-    new_state = PuzzleState()
-    session.add(new_state)
-    await session.commit()
-    return new_state.id, False
+            .scalars()
+            .all()
+        ):
+            if state.placements == placements:
+                return state.id, True
+        new_state = PuzzleState()
+        self.session.add(new_state)
+        await self.session.commit()
+        return new_state.id, False

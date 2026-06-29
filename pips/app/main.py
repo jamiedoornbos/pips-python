@@ -8,7 +8,7 @@ import sqlalchemy as sa
 from fastapi import BackgroundTasks, Body, Depends, FastAPI, HTTPException
 
 from pips.app.models import PuzzleModel
-from pips.db.puzzles import load_puzzle, load_puzzle_titles, save_new_puzzle
+from pips.db.puzzles import CatalogShell
 from pips.db.session import AsyncSession, get_session
 from pips.model import Board
 from pips.solve.shell import BackgroundSolveModel, ResultStatus, Shell, SolverNodeModel, SolverResultModel
@@ -40,15 +40,24 @@ async def root():
 
 
 @app.get('/api/puzzleNames')
-async def get_puzzle_names(session: AsyncSession = Depends(get_session)) -> list[tuple[str, ResultStatus]]:
-    titles = await load_puzzle_titles(session)
+async def get_puzzle_names(catalog: CatalogShell = Depends(CatalogShell)) -> list[tuple[str, ResultStatus]]:
+    titles = await catalog.load_puzzle_titles()
     return [(title, 'not_run') for title in titles]
 
 
 @app.get('/api/puzzles/{puzzle_name}')
-async def get_puzzle(puzzle_name, session: AsyncSession = Depends(get_session)) -> PuzzleModel:
-    if not (board := await load_puzzle(session, puzzle_name)):
+async def get_puzzle(puzzle_name, catalog: CatalogShell = Depends(CatalogShell)) -> PuzzleModel:
+    if not (board := await catalog.puzzle(puzzle_name).load()):
         raise HTTPException(404, 'Puzzle not found')
+    return board
+
+
+@app.post('/api/puzzles/{puzzle_name}')
+async def update_puzzle(puzzle_name, puzzle: Annotated[PuzzleModel, Body(embed=True)], catalog: CatalogShell = Depends(CatalogShell)) -> PuzzleModel:
+    shell = catalog.puzzle(puzzle_name)
+    if not await shell.load():
+        raise HTTPException(404, 'Puzzle not found')
+    board, _version = await shell.update(puzzle.to_board())
     return board
 
 
@@ -97,6 +106,6 @@ async def test_select(session: AsyncSession = Depends(get_session)):
 
 @app.post('/api/puzzles')
 async def create_puzzle(
-    title: Annotated[str, Body()], puzzle: PuzzleModel, session: AsyncSession = Depends(get_session)
+    title: Annotated[str, Body()], puzzle: PuzzleModel, catalog: CatalogShell = Depends(CatalogShell)
 ) -> PuzzleModel:
-    return await save_new_puzzle(session, title, puzzle.to_board())
+    return await catalog.puzzle(title).save_new(puzzle.to_board())
