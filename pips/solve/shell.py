@@ -3,15 +3,10 @@ import logging
 import os
 import re
 import shutil
-import subprocess
 import threading
-import time
 import typing
-from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
-from threading import Thread
 
-import psutil
 from pydantic import BaseModel, Field
 
 from pips.app import models
@@ -24,11 +19,6 @@ from .solver import Solver
 logger = logging.getLogger('pips.solve.shell')
 
 
-PLACEMENT = re.compile(
-    r'^  (?P<left>\d)(?P<right>\d) at \((?P<x>\d+), (?P<y>\d+)\) facing (?P<dir>north|south|east|west)'
-)
-
-
 class BackgroundSolveModel(BaseModel):
     thread: str
     iterations: int
@@ -37,163 +27,11 @@ class BackgroundSolveModel(BaseModel):
     is_running: typing.Annotated[bool, Field(default=False)]
 
 
-class SolverJobModel(BaseModel):
-    pid: int
-    puzzle_name: str
-    memory_usage_mb: float
-    start_time: datetime
-    output: list[str]
-
-
 class SolverNodeModel(BaseModel):
     puzzle_name: str
     id: str
     status: str
     placements: list[models.PlacementModel]
-
-
-@dataclass
-class SolverJob:
-    shell: 'PuzzleShell'
-    model: SolverJobModel
-
-    @property
-    def file(self):
-        return self.shell._data_file('solver')
-
-    def save(self):
-        with open(self.file, 'w') as fp:
-            fp.write(self.model.model_dump_json(indent=2))
-
-    @staticmethod
-    def start(shell: 'PuzzleShell'):
-        solver_job = SolverJob(
-            shell,
-            SolverJobModel(
-                pid=-1,
-                puzzle_name=shell._puzzle_name,
-                memory_usage_mb=0,
-                start_time=datetime.now(tz=UTC),
-                output=[],
-            ),
-        )
-        os.makedirs(os.path.dirname(solver_job.file), exist_ok=True)
-        # mutex
-        with open(solver_job.file, 'x'):
-            pass
-        solver_job.save()
-
-        Thread(target=solver_job.run).start()
-        logger.info(f'Started solver thread for {solver_job}')
-        return solver_job
-
-    def __str__(self):
-        return f'solver job for {self.model.puzzle_name} pid {self.model.pid}'
-
-    @staticmethod
-    def find_orientation(name: str):
-        for orientation in models.Orientation:
-            if orientation.value.name == name:
-                return orientation
-
-    @staticmethod
-    def parse_solutions(output: list[str]) -> list[list[models.PlacementModel]]:
-        solutions, solution = [], None
-        for chunk in output:
-            for line in chunk.split('\n'):
-                if line.startswith('Solution '):
-                    solutions.append(solution := [])
-                elif solution is not None and line.startswith('  '):
-                    match = PLACEMENT.match(line)
-                    if not match:
-                        raise ValueError(f'Unmatching line in solution: {line}')
-                    left, right, x, y = (int(match.group(name)) for name in ('left', 'right', 'x', 'y'))
-                    solution.append(
-                        models.PlacementModel(
-                            domino=models.Domino(left, right),
-                            loc=models.Location(x, y),
-                            dir=match.group('dir'),
-                        )
-                    )
-        return solutions
-
-    def run(self):
-        popen = subprocess.Popen(
-            ['python', '-u', '-m', 'pips.cli.solveproc', self.shell.board_file],
-            text=True,
-            stderr=subprocess.STDOUT,
-            stdout=subprocess.PIPE,
-            stdin=subprocess.DEVNULL,
-        )
-        self.model.pid = popen.pid
-        process = psutil.Process(self.model.pid)
-        memory_limit_mb = 2**13  # 8 GiB
-        # process.rlimit(psutil.RLIMIT_AS, (2 ** 33,) * 2)  # 8 GiB soft & hard
-        self.model.memory_usage_mb = process.memory_info().rss / (2**20)
-        self.save()
-
-        logger.info(f'Launched process for {self}')
-
-        output = []
-
-        def read_output():
-            logger.info(f'Beginning read output for {self}')
-            for line in popen.stdout:
-                output.append(line)
-            logger.info(f'Finished reading output for {self}')
-
-        thread = Thread(target=read_output)
-        thread.start()
-
-        peak_memory_usage = self.model.memory_usage_mb
-        termination_reason = None
-        logger.info(f'Beginning waiting for {self}')
-        while True:
-            time.sleep(2)
-            if popen.poll() is not None:
-                break
-            self.model.memory_usage_mb = memory_usage = process.memory_info().rss / (2**20)
-            # print(f'memory_info {process.memory_info()}')
-            if memory_usage > peak_memory_usage:
-                peak_memory_usage = memory_usage
-            self.model.output = list(output)
-            self.save()
-
-            if memory_usage > memory_limit_mb:
-                logger.info(f'Termainting solver job {self} for exceeding memory limit: {memory_usage}')
-                termination_reason = 'Exceeded memory limit'
-                popen.terminate()
-
-        logger.info(f'Finished waiting for {self}')
-
-        thread.join()
-
-        logger.info(f'Last 5 outputs of {self}: {output[-5:]}')
-
-        completion_time = datetime.now(UTC)
-        return_code = popen.returncode
-        if not return_code and termination_reason:
-            return_code = -99
-        result = SolverResultModel(
-            puzzle_name=self.model.puzzle_name,
-            peak_memory_usage_mb=peak_memory_usage,
-            iterations=0,
-            time_to_solve=completion_time - self.model.start_time,
-            completion_time=completion_time,
-            error=(
-                termination_reason
-                if termination_reason
-                else f'Solver exited with status {return_code}'
-                if return_code
-                else None
-            ),
-            solutions=self.parse_solutions(output),
-        )
-        with open(self.shell._data_file('result'), 'w') as fp:
-            fp.write(result.model_dump_json(indent=2))
-        self.shell.set_result_status('error' if result.error else 'solved' if result.solutions else 'no_solutions')
-        logger.info(f'Removing record of {self}')
-        os.unlink(self.file)
 
 
 class SolverResultModel(BaseModel):
@@ -446,13 +284,6 @@ class PuzzleShell:
 
     def reset_background_solver(self):
         shutil.rmtree(self._data_file('nodes'))
-
-    def launch_solver(self):
-        try:
-            self.get_board()
-            return SolverJob.start(self._shell, self._puzzle_name).model
-        except Exception as ex:
-            raise RuntimeError(f'Could not launch solver for {self._puzzle_name}') from ex
 
     def _find_next_open_node(self) -> SolverNodeModel | None:
         open_nodes = self.get_solver_node_ids('null')
