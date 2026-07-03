@@ -1,7 +1,6 @@
 import functools
 import logging
 import os
-import re
 import shutil
 import threading
 import typing

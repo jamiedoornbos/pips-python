@@ -1,5 +1,5 @@
+import asyncio
 import logging
-import threading
 from contextlib import asynccontextmanager
 from typing import Annotated
 
@@ -15,7 +15,7 @@ from pips.solve.shell import BackgroundSolveModel, ResultStatus, Shell, SolverNo
 
 logging.basicConfig(level=logging.INFO)
 
-shutdown_event = threading.Event()
+shutdown_event = asyncio.Event()
 
 
 @asynccontextmanager
@@ -53,7 +53,9 @@ async def get_puzzle(puzzle_name, catalog: CatalogShell = Depends(CatalogShell))
 
 
 @app.post('/api/puzzles/{puzzle_name}')
-async def update_puzzle(puzzle_name, puzzle: Annotated[PuzzleModel, Body(embed=True)], catalog: CatalogShell = Depends(CatalogShell)) -> PuzzleModel:
+async def update_puzzle(
+    puzzle_name, puzzle: Annotated[PuzzleModel, Body(embed=True)], catalog: CatalogShell = Depends(CatalogShell)
+) -> PuzzleModel:
     shell = catalog.puzzle(puzzle_name)
     if not await shell.load():
         raise HTTPException(404, 'Puzzle not found')
