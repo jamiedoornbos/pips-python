@@ -26,7 +26,7 @@ class Solver(Base):
     error: Mapped[str | None] = mapped_column(String)
     peak_memory_usage_mb: Mapped[float | None] = mapped_column(Float)
     iterations: Mapped[int] = mapped_column(Integer, default=0)
-    status: Mapped[SolverStatus] = mapped_column(Enum(SolverStatus, native_enum=False), default='not_run')
+    status: Mapped[SolverStatus] = mapped_column(Enum(SolverStatus, native_enum=False), default=SolverStatus.NOT_RUN)
     lock: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
 
     puzzle: Mapped[Puzzle] = relationship(Puzzle, back_populates='solver')

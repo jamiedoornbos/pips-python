@@ -1,6 +1,7 @@
 import hashlib
 import struct
 import typing
+from datetime import datetime
 
 from fastapi import Depends
 from sqlalchemy import Select, func, select
@@ -10,6 +11,7 @@ from sqlalchemy.orm import aliased
 from pips.db import Puzzle, PuzzleState
 from pips.db.session import get_session
 from pips.model import Board, Constraint, Domino, Location, LocationSet, Orientation, Placement, Position
+from pips.model.constraint import ConstraintType
 
 _ORIENTATION_INTS = {Orientation.EAST: 0, Orientation.SOUTH: 1, Orientation.WEST: 2, Orientation.NORTH: 3}
 
@@ -58,7 +60,11 @@ def puzzle_to_board(puzzle: Puzzle) -> Board:
     return Board(
         LocationSet(int_to_loc(loc) for loc in puzzle.background),
         tuple(
-            Constraint(LocationSet(int_to_loc(loc) for loc in con['tiles']), con['type'], con['value'])
+            Constraint(
+                LocationSet(int_to_loc(loc) for loc in con['tiles']),
+                ConstraintType.from_name(con['type']),
+                con['value'],
+            )
             for con in puzzle.constraints
         ),
         [int_to_domino(dom) for dom in puzzle.dominoes],
@@ -120,6 +126,16 @@ class PuzzleShell:
     def version(self, version: int) -> PuzzleVersionShell:
         return PuzzleVersionShell(self, version)
 
+    async def latest_version(self) -> PuzzleVersionShell:
+        query = select(func.max(Puzzle.version)).where(Puzzle.title == self.title)
+        version = (await self.session.execute(query)).scalar()
+        return self.version(version)
+
+    async def versions(self) -> list[datetime, int]:
+        query = select(Puzzle).where(Puzzle.title == self.title).order_by(Puzzle.version.asc())
+        puzzles: list[Puzzle] = (await self.session.execute(query)).scalars().all()
+        return [(puzzle.created_at, puzzle.version) for puzzle in puzzles]
+
     async def load(self, version: int | None = None) -> Board:
         if version is not None:
             puzzle = await self.session.get(Puzzle, (self.title, version))
@@ -164,11 +180,10 @@ class PuzzleVersionShell:
     async def load(self) -> Board:
         return await self.puzzle.load(self.version)
 
-    async def upsert_board(self, board: Board) -> tuple[int, bool]:
+    async def upsert_board(self, board: Board, *new_placements: list[Placement]) -> tuple[int, bool]:
         """Inserts the board and returns True if it is new."""
-        if not len(board.placements):
-            raise ValueError('Board has no placements')
         placements = [placement_to_int(placement) for placement in board.placements]
+        placements.extend(placement_to_int(placement) for placement in new_placements)
         placements.sort()
         hash_ = hashlib.sha256(struct.pack(f'{len(placements)}i', *placements)).hexdigest()
         for state in (
@@ -187,7 +202,7 @@ class PuzzleVersionShell:
             if state.placements == placements:
                 return state.id, True
         new_state = PuzzleState(
-            puzzle_title=self.title, puzzle_version=self.verssion, placements=placements, placements_hash=hash_
+            puzzle_title=self.title, puzzle_version=self.version, placements=placements, placements_hash=hash_
         )
         self.session.add(new_state)
         await self.session.commit()

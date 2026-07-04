@@ -20,6 +20,9 @@ class SolverCaches:
     def add_node(self, parent: Node, placement: Placement) -> tuple[Node | BoardStatus, bool]:
         raise NotImplementedError()
 
+    async def add_node_async(self, parent: Node, placement: Placement) -> tuple[Node | BoardStatus, bool]:
+        raise NotImplementedError()
+
     def get_constraint(self, loc: Location) -> Constraint | None:
         raise NotImplementedError()
 
@@ -56,10 +59,10 @@ class Node:
     def status(self) -> BoardStatus | None:
         return self._status
 
-    def expand(self, solver: SolverCaches, debug: SolverDebug):
+    def _compute_placements(self, solver: SolverCaches, debug: SolverDebug) -> list[Placement]:
         if not self.board.empty_locations:
             self._status = self._board.test_finished().status
-            return
+            return []
 
         # check that each constraint is potentially solvable
         available_pips: list[PipCount] = []
@@ -71,15 +74,15 @@ class Node:
             if not self._can_meet(constraint, available_pips):
                 debug.add_message(self, f'Aborted expansion because constraint {constraint} is not solvable')
                 self._status = 'lost'
-                return
+                return []
 
         # to_place = self._expand_using_brute_force(solver, debug)
         _, to_place = self._expand_using_ranked_locations(solver, debug)
+        return to_place
 
-        # spawn the children
+    def _finish_expand(self, placed: list[tuple[Placement, Node, bool]], debug: SolverDebug):
         child_count = 0
-        for placement in to_place:
-            _child_node, existed = solver.add_node(self, placement)
+        for placement, _child, existed in placed:
             if existed:
                 debug.add_message(
                     self, f'Skipped placement {placement} since it resulted in a board that was already visited'
@@ -87,10 +90,21 @@ class Node:
                 continue
             child_count += 1
 
-        debug.add_message(self, f'Found {len(to_place)} placements and added {child_count} unique children')
+        if not self._status:
+            debug.add_message(self, f'Found {len(placed)} placements and added {child_count} unique children')
 
-        # set closure status
-        self._status = 'incomplete'
+            # set closure status
+            self._status = 'incomplete'
+
+    def expand(self, solver: SolverCaches, debug: SolverDebug):
+        to_place = self._compute_placements(solver, debug)
+        new_nodes = [(placement, *solver.add_node(self, placement)) for placement in to_place]
+        self._finish_expand(new_nodes, debug)
+
+    async def expand_async(self, solver: SolverCaches, debug: SolverDebug):
+        to_place = self._compute_placements(solver, debug)
+        new_nodes = [(placement, *(await solver.add_node_async(self, placement))) for placement in to_place]
+        self._finish_expand(new_nodes, debug)
 
     def _expand_using_brute_force(self, solver: SolverCaches, debug: SolverDebug) -> list[Placement]:
         # find the valid location and orientation pairs

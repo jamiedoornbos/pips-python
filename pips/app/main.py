@@ -10,6 +10,7 @@ from fastapi import BackgroundTasks, Body, Depends, FastAPI, HTTPException
 from pips.app.models import PuzzleModel
 from pips.db.puzzles import CatalogShell
 from pips.db.session import AsyncSession, get_session
+from pips.db.solvers import SolverShell
 from pips.model import Board
 from pips.solve.shell import BackgroundSolveModel, ResultStatus, Shell, SolverNodeModel, SolverResultModel
 
@@ -81,8 +82,9 @@ async def start_solver_job(puzzle_name, tasks: BackgroundTasks) -> BackgroundSol
 
 
 @app.get('/api/puzzles/{puzzle_name}/solverResult')
-async def get_solver_result(puzzle_name) -> SolverResultModel | None:
-    return shell.puzzle(puzzle_name).get_solver_result()
+async def get_solver_result(puzzle_name, catalog: CatalogShell = Depends(CatalogShell)) -> SolverResultModel | None:
+    solver = SolverShell(await catalog.puzzle(puzzle_name).latest_version())
+    return await solver.get_result()
 
 
 @app.get('/api/puzzles/{puzzle_name}/solverNodes/ids')
