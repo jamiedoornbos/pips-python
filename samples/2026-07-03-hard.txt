@@ -1,0 +1,31 @@
+# Title
+2026-07-03-hard
+# Background
+.....@@@
+@..A.B..
+C..D.BEE
+CFFD...G
+.......G
+.HII.JKL
+.H.M....
+.NNM....
+.O.M....
+.O.M....
+# Constraints
+M: match
+I: eq 5
+H: eq 6
+N: eq 12
+O: eq 10
+C: match
+F: eq 12
+D: eq 10
+A: eq 3
+B: eq 7
+E: match
+G: eq 2
+L: eq 5
+K: eq 3
+J: eq 1
+# Dominoes
+15 44 31 02 53 22 64 55 32 01 63 04 56 34 06 54

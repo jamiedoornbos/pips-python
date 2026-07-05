@@ -1,8 +1,10 @@
 import asyncio
+import pathlib
 
 import typer
 
 from pips.app import main
+from pips.data.boardtostr import board_to_str
 from pips.db.engine import async_session
 from pips.db.puzzles import CatalogShell
 from pips.db.solvers import SolverShell
@@ -51,6 +53,30 @@ def import_samples(force: bool = False):
                 else:
                     await puzzle.save_new(board)
                     print(f'Saved new puzzle {title}')
+
+    run_async(_run())
+
+
+@app.command()
+def export_samples(force: bool = False):
+    """Export puzzles from the database to samples/."""
+
+    async def _run():
+        async with async_session() as session:
+            catalog = CatalogShell(session)
+            titles = set(await catalog.load_puzzle_titles())
+            existing_titles = set(main.shell.get_boards().keys())
+            for title in titles:
+                if (exists := title in existing_titles) and not force:
+                    print(f'Skipping {title} already in samples/')
+                    continue
+                board = await catalog.puzzle(title).load()
+                path = pathlib.Path(main.shell.samples_dir, f'{title}.txt')
+                path.write_text(board_to_str(board, title))
+                if exists:
+                    print(f'Overwrote file {path}')
+                else:
+                    print(f'Saved new file {title}')
 
     run_async(_run())
 
