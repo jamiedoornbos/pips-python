@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import create_async_engine
 
 from alembic import context
 from pips.db import Base
+import pips.config
 
 dotenv.load_dotenv()
 
@@ -21,7 +22,7 @@ target_metadata = Base.metadata
 
 
 def run_migrations_offline() -> None:
-    url = os.environ['DATABASE_URL']
+    url = pips.config.DATABASE_URL
     context.configure(
         url=url,
         target_metadata=target_metadata,
@@ -40,9 +41,11 @@ def do_run_migrations(connection):
 
 
 async def run_migrations_online() -> None:
+    print(f'ALEMBIC RUNNING: {pips.config.DATABASE_URL=}')
     connectable = create_async_engine(
-        os.environ['DATABASE_URL'],
+        pips.config.DATABASE_URL,
         poolclass=pool.NullPool,
+        connect_args=pips.config.DATABASE_CONNECT_ARGS,
     )
 
     async with connectable.connect() as connection:
