@@ -5,7 +5,7 @@ from typing import Annotated
 
 import cachetools
 import sqlalchemy as sa
-from fastapi import BackgroundTasks, Body, Depends, FastAPI, HTTPException
+from fastapi import Body, Depends, FastAPI, HTTPException
 
 from pips.app.models import PuzzleModel
 from pips.db.puzzles import CatalogShell
@@ -17,12 +17,15 @@ from pips.solve.shell import BackgroundSolveModel, ResultStatus, Shell, SolverNo
 logging.basicConfig(level=logging.INFO)
 
 shutdown_event = asyncio.Event()
+running_tasks: set[asyncio.Task] = set()
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     yield
     shutdown_event.set()
+    if running_tasks:
+        await asyncio.gather(*running_tasks, return_exceptions=True)
 
 
 app = FastAPI(lifespan=lifespan)
@@ -43,7 +46,7 @@ async def root():
 @app.get('/api/puzzleNames')
 async def get_puzzle_names(catalog: CatalogShell = Depends(CatalogShell)) -> list[tuple[str, ResultStatus]]:
     titles = await catalog.load_puzzle_titles()
-    return [(title, 'not_run') for title in titles]
+    return [(title, status or 'not_run') for title, status in titles]
 
 
 @app.get('/api/puzzles/{puzzle_name}')
@@ -65,20 +68,31 @@ async def update_puzzle(
 
 
 @app.get('/api/puzzles/{puzzle_name}/solverJob')
-async def get_solver_job(puzzle_name) -> BackgroundSolveModel | None:
-    return shell.puzzle(puzzle_name).get_solver_job()
+async def get_solver_job(
+    puzzle_name: str, catalog: CatalogShell = Depends(CatalogShell)
+) -> BackgroundSolveModel | None:
+    shell = SolverShell(await catalog.puzzle(puzzle_name).latest_version())
+    solver = await shell.load()
+    if not solver or not solver.lock:
+        return None
+    return BackgroundSolveModel(
+        thread='', iterations=solver.iterations, start_time=solver.started_at, output=[], is_running=True
+    )
 
 
 @app.post('/api/puzzles/{puzzle_name}/solverJob')
-async def start_solver_job(puzzle_name, tasks: BackgroundTasks) -> BackgroundSolveModel:
-    puzzle = shell.puzzle(puzzle_name)
-    job = puzzle.init_background_solve()
+async def start_solver_job(puzzle_name: str, catalog: CatalogShell = Depends(CatalogShell)) -> BackgroundSolveModel:
+    shell = SolverShell(await catalog.puzzle(puzzle_name).latest_version())
+    await shell.init_solver()
+    solver = await shell.load()
 
-    def run():
-        puzzle.background_solve(shutdown_event)
+    task = asyncio.create_task(shell.background_solve(shutdown_event))
+    running_tasks.add(task)
+    task.add_done_callback(running_tasks.discard)
 
-    tasks.add_task(run)
-    return job
+    return BackgroundSolveModel(
+        thread='', iterations=solver.iterations, start_time=solver.started_at, output=[], is_running=True
+    )
 
 
 @app.get('/api/puzzles/{puzzle_name}/solverResult')
