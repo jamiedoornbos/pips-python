@@ -55,10 +55,7 @@ def upgrade() -> None:
             ['puzzle_state_id'],
             ['puzzle_state.id'],
         ),
-        sa.ForeignKeyConstraint(
-            ['solver_id'],
-            ['solver.id'],
-        ),
+        sa.ForeignKeyConstraint(['solver_id'], ['solver.id'], ondelete='cascade'),
         sa.PrimaryKeyConstraint('id'),
         sa.UniqueConstraint('solver_id', 'puzzle_state_id'),
     )

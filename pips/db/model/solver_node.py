@@ -11,7 +11,7 @@ class SolverNode(Base):
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
     num_placements: Mapped[int] = mapped_column(Integer, nullable=False)
-    solver_id: Mapped[int] = mapped_column(ForeignKey(Solver.id), nullable=False)
+    solver_id: Mapped[int] = mapped_column(ForeignKey(Solver.id, ondelete='cascade'), nullable=False)
     puzzle_state_id: Mapped[int] = mapped_column(ForeignKey(PuzzleState.id), nullable=False)
     status: Mapped[str] = mapped_column(Text, nullable=False, default='unvisited')
 
