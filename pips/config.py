@@ -10,7 +10,7 @@ def _parse_db_url():
     raw_url = os.environ['DATABASE_URL']
     url = raw_url.replace('postgresql://', 'postgresql+asyncpg://').replace('sslmode=require', '')
     host = urlparse(raw_url).hostname
-    connect_args = {"ssl": True} if host != "localhost" else {}
+    connect_args = {'ssl': True} if host != 'localhost' else {}
     return url, connect_args
 
 

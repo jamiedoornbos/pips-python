@@ -1,6 +1,6 @@
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
-from pips.config import DATABASE_URL, DATABASE_CONNECT_ARGS
+from pips.config import DATABASE_CONNECT_ARGS, DATABASE_URL
 
 engine = create_async_engine(
     DATABASE_URL,

@@ -1,6 +1,4 @@
-from pydantic import constr
-
-from pips.model import Board, Constraint, ConstraintType, Domino, Location, LocationSet, PipCount
+from pips.model import Board, Location
 
 
 def board_to_str(board: Board, title: str) -> str:
@@ -21,7 +19,9 @@ def board_to_str(board: Board, title: str) -> str:
             else:
                 key = constraint_keys.get(constraint)
                 if key is None:
-                    key = next(ch for ch in 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789' if ch not in constraint_keys.values())
+                    key = next(
+                        ch for ch in 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789' if ch not in constraint_keys.values()
+                    )
                     constraint_keys[constraint] = key
                 result[-1] += key
     result.append('# Constraints')
