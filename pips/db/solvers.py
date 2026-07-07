@@ -5,14 +5,14 @@ import typing
 
 import sqlalchemy
 from sqlalchemy import select
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 
 from pips.app.models import PlacementModel
-from pips.db.model.puzzle_state import PuzzleState
 from pips.db.model.solver import Solver, SolverStatus
 from pips.db.model.solver_node import SolverNode
-from pips.db.puzzles import CatalogShell, PuzzleVersionShell, int_to_placement
+from pips.db.puzzles import CatalogShell, PuzzleVersionShell, bytes_to_placements, int_to_placement
 from pips.db.session import async_session
 from pips.model.board import Board, BoardStatus
 from pips.model.placement import Placement
@@ -30,43 +30,42 @@ def _to_model(solver: Solver) -> BackgroundSolveModel:
     )
 
 
-def _get_num_placements(solver_node: SolverNode):
-    return solver_node.num_placements
+def _get_num_placements(entry: tuple[SolverNode, list[Placement]]):
+    return entry[0].num_placements
 
 
 class DatabaseNodeOrchestrator(CoreSolver):
     def __init__(self, board: Board, shell: PuzzleVersionShell, solver: Solver, opened: list[SolverNode]):
         super().__init__(board)
         self._shell = shell
-        self._opened = opened
+        self._opened: list[tuple[SolverNode, list[Placement]]] = [
+            (node, bytes_to_placements(node.puzzle_state.placements)) for node in opened
+        ]
         self._solver = solver
 
-    def pop_open(self) -> SolverNode | None:
+    def pop_open(self) -> tuple[SolverNode, list[Placement]] | tuple[None, None]:
         self._opened.sort(key=_get_num_placements, reverse=True)
         if not self._opened:
-            return None
+            return None, None
         return self._opened.pop()
 
     async def add_node_async(self, parent: Node, placement: Placement):
         session = self._shell.session
-        state_id, _state_existed = await self._shell.upsert_board(parent.board, placement)
-        query = select(SolverNode).where(SolverNode.puzzle_state_id == state_id)
-
-        # TODO: use postgres dialect upsert for 1 round trip instead of 2
-        if node := (await session.execute(query)).scalars().first():
-            return node.status, True
-
-        puzzle_state = await session.get(PuzzleState, state_id)
-        session.add(
-            node := SolverNode(
-                num_placements=len(parent.board.placements) + 1,
-                solver=self._solver,
-                puzzle_state=puzzle_state,
+        state_id = await self._shell.upsert_board(parent.board, placement)
+        stmt = (
+            pg_insert(SolverNode)
+            .values(
+                num_placements=len(parent.board.placements) + 1, solver_id=self._solver.id, puzzle_state_id=state_id
             )
+            .on_conflict_do_update(
+                index_elements=[SolverNode.solver_id, SolverNode.puzzle_state_id],
+                set_={'num_placements': len(parent.board.placements) + 1},  # no-op to fire RETURNING
+            )
+            .returning(SolverNode)
         )
-        await session.commit()
-        self._opened.append(node)
-        return node.status, False
+        node = (await session.scalars(stmt)).first()
+        self._opened.append((node, [*parent.board.placements, placement]))
+        return state_id
 
 
 class SolverShell:
@@ -87,7 +86,7 @@ class SolverShell:
 
     async def get_result(self) -> SolverResultModel | None:
         solver = await self.load()
-        if solver.status != SolverStatus.SOLVED:
+        if not solver or solver.status != SolverStatus.SOLVED:
             return None
 
         solutions = []
@@ -125,7 +124,7 @@ class SolverShell:
     async def init_solver(self) -> BackgroundSolveModel:
         title = self.puzzle.title
         version = self.puzzle.version
-        state_id, _existed = await self.puzzle.upsert_board(await self.puzzle.load())
+        state_id = await self.puzzle.upsert_board(await self.puzzle.load())
         try:
             self.session.add_all(
                 [
@@ -217,18 +216,18 @@ class SolverShell:
         new_solutions = []
 
         for _ in range(count):
-            current_node: SolverNode = orchestrator.pop_open()
+            current_node, placements = orchestrator.pop_open()
             if not current_node or cancel_event.is_set():
                 break
             board = orchestrator.board.copy(reset=False)
-            for int_placement in current_node.puzzle_state.placements:
-                board.place(int_to_placement(int_placement))
+            for placement in placements:
+                board.place(placement)
             node = Node(board)
             await node.expand_async(orchestrator, orchestrator)
             current_node.status = node.status
             if node.status == 'won':
                 new_solutions.append(current_node)
             solver.iterations += 1
-            await self.session.commit()
 
+        await self.session.commit()
         return new_solutions, current_node is None

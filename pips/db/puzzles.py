@@ -1,17 +1,19 @@
-import hashlib
 import struct
 import typing
 from datetime import datetime
 
 from fastapi import Depends
 from sqlalchemy import Select, func, select
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import aliased
 
 from pips.db import Puzzle, PuzzleState
+from pips.db.model.solver import Solver
 from pips.db.session import get_session
 from pips.model import Board, Constraint, Domino, Location, LocationSet, Orientation, Placement, Position
 from pips.model.constraint import ConstraintType
+from pips.solve.shell import ResultStatus
 
 _ORIENTATION_INTS = {Orientation.EAST: 0, Orientation.SOUTH: 1, Orientation.WEST: 2, Orientation.NORTH: 3}
 
@@ -85,6 +87,14 @@ def int_to_placement(pl: int) -> Placement:
     return Placement(domino, Position(loc, orientation))
 
 
+def placements_to_bytes(placements: typing.Sequence[Placement]) -> bytes:
+    return struct.pack(f'{len(placements)}i', *sorted(map(placement_to_int, placements)))
+
+
+def bytes_to_placements(placements: bytes) -> list[Placement]:
+    return [int_to_placement(int_placement) for int_placement in struct.unpack(f'{len(placements) // 4}i', placements)]
+
+
 def _latest_versions() -> tuple[Select, type[Puzzle]]:
     ranked = select(
         Puzzle,
@@ -108,10 +118,20 @@ class CatalogShell:
     def puzzle(self, title: str) -> PuzzleShell:
         return PuzzleShell(self, title)
 
-    async def load_puzzle_titles(self) -> list[str]:
+    async def load_puzzle_titles(self) -> list[tuple[str, ResultStatus]]:
         stmt, LatestPuzzle = _latest_versions()
-        stmt = stmt.with_only_columns(LatestPuzzle.title).order_by(LatestPuzzle.created_at.desc())
-        return (await self.session.execute(stmt)).scalars().all()
+        stmt = (
+            stmt.join(
+                Solver,
+                (LatestPuzzle.title == Solver.puzzle_title) & (LatestPuzzle.version == Solver.puzzle_version),
+                isouter=True,
+            )
+            .with_only_columns(LatestPuzzle.title, Solver.status)
+            .order_by(LatestPuzzle.created_at.desc())
+        )
+        return [
+            (title, status.value if status else 'not_run') for title, status in (await self.session.execute(stmt)).all()
+        ]
 
 
 class PuzzleShell:
@@ -180,30 +200,17 @@ class PuzzleVersionShell:
     async def load(self) -> Board:
         return await self.puzzle.load(self.version)
 
-    async def upsert_board(self, board: Board, *new_placements: list[Placement]) -> tuple[int, bool]:
+    async def upsert_board(self, board: Board, *new_placements: list[Placement]) -> int:
         """Inserts the board and returns True if it is new."""
-        placements = [placement_to_int(placement) for placement in board.placements]
-        placements.extend(placement_to_int(placement) for placement in new_placements)
-        placements.sort()
-        hash_ = hashlib.sha256(struct.pack(f'{len(placements)}i', *placements)).hexdigest()
-        for state in (
-            (
-                await self.session.execute(
-                    select(PuzzleState).where(
-                        PuzzleState.puzzle_title == self.puzzle.title,
-                        PuzzleState.puzzle_version == self.version,
-                        PuzzleState.placements_hash == hash_,
-                    )
-                )
+        placements = placements_to_bytes([*board.placements, *new_placements])
+        stmt = (
+            pg_insert(PuzzleState)
+            .values(puzzle_title=self.title, puzzle_version=self.version, placements=placements)
+            .on_conflict_do_update(
+                index_elements=[PuzzleState.puzzle_title, PuzzleState.puzzle_version, PuzzleState.placements],
+                set_={'placements': placements},  # no-op to fire RETURNING
             )
-            .scalars()
-            .all()
-        ):
-            if state.placements == placements:
-                return state.id, True
-        new_state = PuzzleState(
-            puzzle_title=self.title, puzzle_version=self.version, placements=placements, placements_hash=hash_
+            .returning(PuzzleState.id)
         )
-        self.session.add(new_state)
-        await self.session.commit()
-        return new_state.id, False
+        state_id = (await self.session.execute(stmt)).scalar_one()
+        return state_id
