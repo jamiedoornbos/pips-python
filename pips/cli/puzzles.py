@@ -96,6 +96,50 @@ def list_versions(title: str):
 
 
 @app.command()
+def show_solver(title: str, version: int | None = None):
+    """Shows solver of a puzzle title."""
+
+    async def run():
+        async with async_session() as session:
+            puzzle = CatalogShell(session).puzzle(title)
+            shell = SolverShell(puzzle.version(version if version is not None else (await puzzle.versions())[-1][1]))
+            solver = await shell.load()
+            if not solver:
+                print(f'Solver for {title} version {shell.version} not found')
+            else:
+                print(f'Solver {title} version {shell.version}:')
+                print(f'   id: {solver.id}')
+                print(f'   lock: {solver.lock}')
+                print(f'   status: {solver.status}')
+                print(f'   iterations: {solver.iterations}')
+                print(f'   peak_memory_usage_mb: {solver.peak_memory_usage_mb}')
+                print(f'   started_at: {solver.started_at}')
+                print(f'   finished_at: {solver.finished_at}')
+                print(f'   error: {solver.error}')
+
+    run_async(run())
+
+
+@app.command()
+def delete_solver(title: str, version: int | None = None):
+    """Deletes the solver of a puzzle title."""
+
+    async def run():
+        async with async_session() as session:
+            puzzle = CatalogShell(session).puzzle(title)
+            shell = SolverShell(puzzle.version(version if version is not None else (await puzzle.versions())[-1][1]))
+            solver = await shell.load()
+            if not solver:
+                print(f'Solver for {title} version {shell.version} not found')
+            else:
+                await session.delete(solver)
+                await session.commit()
+                print(f'Solver for {title} version {shell.version} deleted')
+
+    run_async(run())
+
+
+@app.command()
 def test_solve(title: str, version: int | None = None):
     # TODO: handle keyboard interrups correctly using tasks and shutdown event
     async def run():
