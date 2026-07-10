@@ -4,8 +4,8 @@ import logging
 import typing
 
 import sqlalchemy
-from sqlalchemy import select
-from sqlalchemy.dialects.postgresql import insert as pg_insert
+from sqlalchemy import select, update
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 
@@ -52,20 +52,21 @@ class DatabaseNodeOrchestrator(CoreSolver):
     async def add_node_async(self, parent: Node, placement: Placement):
         session = self._shell.session
         state_id = await self._shell.upsert_board(parent.board, placement)
-        stmt = (
-            pg_insert(SolverNode)
-            .values(
-                num_placements=len(parent.board.placements) + 1, solver_id=self._solver.id, puzzle_state_id=state_id
+        try:
+            async with session.begin_nested():
+                session.add(
+                    node := SolverNode(
+                        solver_id=self._solver.id, puzzle_state_id=state_id, num_placements=len(parent.board.placements) + 1
+                    )
+                )
+            self._opened.append((node, [*parent.board.placements, placement]))
+            return node.status, False
+        except IntegrityError:
+            query = select(SolverNode).where(
+                SolverNode.solver_id == self._solver.id, SolverNode.puzzle_state_id == state_id
             )
-            .on_conflict_do_update(
-                index_elements=[SolverNode.solver_id, SolverNode.puzzle_state_id],
-                set_={'num_placements': len(parent.board.placements) + 1},  # no-op to fire RETURNING
-            )
-            .returning(SolverNode)
-        )
-        node = (await session.scalars(stmt)).first()
-        self._opened.append((node, [*parent.board.placements, placement]))
-        return state_id
+            node = (await session.execute(query)).scalar_one()
+            return node.status, True
 
 
 class SolverShell:
@@ -173,6 +174,7 @@ class SolverShell:
                         break
                 error = None
             except Exception as ex:
+                logger.exception(f'An error occured during solve for {self.title}')
                 error = str(ex)
 
             solver.finished_at = datetime.datetime.now(tz=datetime.UTC)
@@ -184,7 +186,7 @@ class SolverShell:
 
             logger.info(f'Finished background solve for {self.title} after {solver.iterations} iterations')
         except:
-            self.session.rollback()
+            await self.session.rollback()
             raise
         finally:
             solver = await self.load()
@@ -228,6 +230,6 @@ class SolverShell:
             if node.status == 'won':
                 new_solutions.append(current_node)
             solver.iterations += 1
-
-        await self.session.commit()
+            await self.session.commit()
+    
         return new_solutions, current_node is None
