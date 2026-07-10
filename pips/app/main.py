@@ -7,8 +7,8 @@ import cachetools
 import sqlalchemy as sa
 from fastapi import Body, Depends, FastAPI, HTTPException
 
-from pips.app.models import PuzzleModel
-from pips.db.puzzles import CatalogShell
+from pips.app.models import PlacementModel, PuzzleModel
+from pips.db.puzzles import CatalogShell, bytes_to_placements
 from pips.db.session import AsyncSession, get_session
 from pips.db.solvers import SolverShell
 from pips.model import Board
@@ -107,13 +107,26 @@ async def get_solver_node_ids(puzzle_name) -> list[str]:
 
 
 @app.get('/api/puzzles/{puzzle_name}/solverNodes/solutions')
-async def get_won_node_ids(puzzle_name) -> list[str]:
-    return shell.puzzle(puzzle_name).get_solver_node_ids('won')
+async def get_won_node_ids(puzzle_name: str, catalog: CatalogShell = Depends(CatalogShell)) -> list[str]:
+    solver = SolverShell(await catalog.puzzle(puzzle_name).latest_version())
+    nodes = await solver.get_nodes('won')
+    return [f'A{node.id}' for node in nodes]
 
 
 @app.get('/api/puzzles/{puzzle_name}/solverNodes/{node_id:path}')
-async def get_solver_node(puzzle_name, node_id) -> SolverNodeModel:
-    return shell.puzzle(puzzle_name).get_solver_node(node_id)
+async def get_solver_node(
+    puzzle_name: str, node_id: str, catalog: CatalogShell = Depends(CatalogShell)
+) -> SolverNodeModel:
+    node = await SolverShell.load_node(catalog.session, int(node_id[1:]))
+    return SolverNodeModel(
+        puzzle_name=node.solver.puzzle_title,
+        id=f'A{node.id}',
+        status=node.status,
+        placements=[
+            PlacementModel(domino=placement.domino, loc=placement.pos.loc, dir=placement.pos.dir.value.name)
+            for placement in bytes_to_placements(node.puzzle_state.placements)
+        ],
+    )
 
 
 @app.get('/api/test-select')
