@@ -70,6 +70,16 @@ class DatabaseNodeOrchestrator(CoreSolver):
 
 
 class SolverShell:
+    @staticmethod
+    async def load_node(session: AsyncSession, node_id: int) -> SolverNode:
+        query = (
+            select(SolverNode)
+            .where(SolverNode.id == node_id)
+            .options(joinedload(SolverNode.solver), joinedload(SolverNode.puzzle_state))
+        )
+        node: SolverNode = (await session.execute(query)).scalar_one()
+        return node
+
     def __init__(self, puzzle: PuzzleVersionShell):
         self.puzzle = puzzle
 

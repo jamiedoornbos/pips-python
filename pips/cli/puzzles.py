@@ -6,7 +6,7 @@ import typer
 from pips.app import main
 from pips.data.boardtostr import board_to_str
 from pips.db.engine import async_session
-from pips.db.puzzles import CatalogShell
+from pips.db.puzzles import CatalogShell, bytes_to_placements
 from pips.db.solvers import SolverShell
 
 app = typer.Typer()
@@ -96,7 +96,7 @@ def list_versions(title: str):
 
 
 @app.command()
-def show_solver(title: str, version: int | None = None):
+def show_solver(title: str, version: int | None = None, with_nodes: bool = False):
     """Shows solver of a puzzle title."""
 
     async def run():
@@ -116,6 +116,36 @@ def show_solver(title: str, version: int | None = None):
                 print(f'   started_at: {solver.started_at}')
                 print(f'   finished_at: {solver.finished_at}')
                 print(f'   error: {solver.error}')
+                if with_nodes:
+                    print('   nodes:')
+                    for node in await shell.get_nodes():
+                        print(
+                            f'        id: {node.id}, placements: {node.num_placements}, status: {node.status}, state: {node.puzzle_state_id}'
+                        )
+
+    run_async(run())
+
+
+@app.command()
+def show_node(node_id: int):
+    """Shows solver of a puzzle title."""
+
+    async def run():
+        async with async_session() as session:
+            node = await SolverShell.load_node(session, node_id)
+            if not node:
+                print(f'SolverNode {node_id} not found')
+            else:
+                print(f'Node {node_id}')
+                print(f'   solver_id: {node.solver_id}')
+                print(f'   puzzle_title: {node.solver.puzzle_title}')
+                print(f'   puzzle_version: {node.solver.puzzle_version}')
+                print(f'   status: {node.status}')
+                print(f'   puzzle_state_id: {node.puzzle_state_id}')
+                print(f'   placements blob: {node.puzzle_state.placements}')
+                print(f'   placements ({len(placements := bytes_to_placements(node.puzzle_state.placements))}):')
+                for placement in placements:
+                    print(f'       {placement}')
 
     run_async(run())
 
