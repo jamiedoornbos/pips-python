@@ -134,6 +134,11 @@ class SolverShell:
             .first()
         )
 
+    async def reset_solver(self) -> None:
+        solver = await self.load()
+        if solver:
+            await self.session.delete(solver)
+
     async def init_solver(self) -> BackgroundSolveModel:
         title = self.puzzle.title
         version = self.puzzle.version
@@ -172,9 +177,7 @@ class SolverShell:
             await self.session.commit()
 
             solutions = await self.get_nodes('won')
-            logger.info(
-                f'Starting background solve for {self.title} version {self.version} {len(solutions)} solutions so far'
-            )
+            logger.info(f'Starting solve for {self.title} version {self.version} - {len(solutions)} solutions')
 
             try:
                 while True:

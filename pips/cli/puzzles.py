@@ -41,7 +41,7 @@ def import_samples(force: bool = False):
         async with async_session() as session:
             samples = main.shell.get_boards()
             catalog = CatalogShell(session)
-            existing_titles = set(await catalog.load_puzzle_titles())
+            existing_titles = {t for t, _ in await catalog.load_puzzle_titles()}
             for title, (board, _status) in samples.items():
                 if (exists := title in existing_titles) and not force:
                     print(f'Skipping {title} already in db')
@@ -66,7 +66,7 @@ def export_samples(force: bool = False):
             catalog = CatalogShell(session)
             titles = set(await catalog.load_puzzle_titles())
             existing_titles = set(main.shell.get_boards().keys())
-            for title in titles:
+            for title, _ in titles:
                 if (exists := title in existing_titles) and not force:
                     print(f'Skipping {title} already in samples/')
                     continue

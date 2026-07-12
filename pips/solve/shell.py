@@ -282,7 +282,9 @@ class PuzzleShell:
         logger.info(f'Finished background solve for {self._puzzle_name} after {job.iterations} iterations')
 
     def reset_background_solver(self):
-        shutil.rmtree(self._data_file('nodes'))
+        nodes = self._data_file('nodes')
+        if os.path.exists(nodes):
+            shutil.rmtree(self._data_file('nodes'))
 
     def _find_next_open_node(self) -> SolverNodeModel | None:
         open_nodes = self.get_solver_node_ids('null')
