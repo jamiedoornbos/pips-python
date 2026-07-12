@@ -1,0 +1,28 @@
+# Title
+2026-07-09-hard
+# Background
+ABB....
+C.D.EEF
+GHH.I..
+JH..IK.
+L.M.N..
+O.M.PP@
+# Constraints
+A: gt 3
+B: eq 3
+C: lt 3
+D: gt 3
+H: eq 3
+G: eq 3
+J: lt 3
+L: lt 3
+O: gt 4
+M: eq 3
+E: gt 7
+F: lt 2
+I: eq 6
+K: eq 6
+N: eq 6
+P: eq 3
+# Dominoes
+62 43 11 30 12 54 23 16 25 04 13 24
