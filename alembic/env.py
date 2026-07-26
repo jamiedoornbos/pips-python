@@ -40,7 +40,6 @@ def do_run_migrations(connection):
 
 
 async def run_migrations_online() -> None:
-    print(f'ALEMBIC RUNNING: {pips.config.DATABASE_URL=}')
     connectable = create_async_engine(
         pips.config.DATABASE_URL,
         poolclass=pool.NullPool,
