@@ -315,6 +315,10 @@ class Node:
                 best_location = location
                 best_placements = valid_placements
 
+        if not best_location:
+            debug.add_message(self, f'No best location found for expansion')
+            return None, []
+
         return best_location, best_placements
 
         # positions = sorted(solver.get_valid_positions(self.board), key=rank_position)
