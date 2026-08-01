@@ -1,0 +1,21 @@
+# Title
+2026-07-14-hard
+# Background
+AAA.BBC
+D...E.C
+FG..HHC
+F...H.I
+F...J.I
+# Constraints
+A: eq 9
+D: lt 3
+G: gt 3
+F: eq 8
+B: eq 8
+C: match
+E: gt 3
+H: match
+J: gt 2
+I: match
+# Dominoes
+06 16 26 23 33 34 44 45 56 66

@@ -1,0 +1,37 @@
+# Title
+2026-07-19-hard
+# Background
+..AA..
+.BCDE.
+FGCDHI
+JKLLMN
+.OLPQ.
+..LP..
+..LR..
+..RR..
+.STUV.
+# Constraints
+A: eq 4
+B: eq 4
+C: eq 9
+D: eq 7
+E: gt 4
+H: eq 2
+I: eq 6
+N: eq 4
+M: eq 4
+Q: eq 4
+L: match
+P: eq 0
+R: match
+S: lt 4
+T: eq 4
+U: eq 4
+V: gt 4
+G: eq 1
+F: eq 4
+J: eq 4
+K: eq 5
+O: lt 4
+# Dominoes
+44 11 22 15 66 41 30 54 33 10 43 12 46 40 16 42

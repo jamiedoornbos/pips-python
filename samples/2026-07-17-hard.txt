@@ -1,0 +1,31 @@
+# Title
+2026-07-17-hard
+# Background
+AAA.BBC..
+D...E.C..
+DFF.E.G..
+..H.I.G..
+..H.IJG..
+KLL....M.
+.......N.
+.......N.
+.......N.
+.......NO
+# Constraints
+A: eq 7
+D: eq 10
+F: eq 10
+H: eq 2
+L: eq 8
+K: eq 6
+I: match
+J: eq 5
+G: match
+C: eq 5
+B: eq 5
+E: eq 10
+M: eq 4
+N: match
+O: eq 2
+# Dominoes
+34 60 32 56 33 41 66 03 61 24 05 12 46 11 62
