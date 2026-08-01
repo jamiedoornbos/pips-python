@@ -1,0 +1,43 @@
+# Title
+2026-07-12-hard
+# Background
+ABCD
+EFGH
+IJKK
+LMKK
+NOPQ
+RSTU
+VWXY
+Z012
+# Constraints
+0: eq 4
+1: eq 4
+2: eq 0
+D: eq 2
+C: eq 0
+B: eq 5
+A: eq 3
+E: eq 2
+F: eq 4
+G: eq 4
+H: eq 2
+I: eq 5
+J: eq 1
+K: eq 18
+L: eq 0
+M: eq 3
+N: eq 3
+O: eq 0
+P: eq 0
+Q: eq 1
+R: eq 3
+S: eq 1
+T: eq 5
+U: eq 1
+V: eq 5
+W: eq 1
+X: eq 2
+Y: eq 3
+Z: eq 2
+# Dominoes
+01 02 03 04 05 12 13 14 15 23 24 25 34 35 45 36

@@ -1,0 +1,24 @@
+# Title
+2026-07-13-hard
+# Background
+AABBC.DE
+..F...DE
+..F...GE
+..H...GI
+..H...JI
+..K...JL
+# Constraints
+A: eq 4
+B: eq 3
+C: lt 2
+F: eq 3
+H: eq 5
+K: eq 5
+D: eq 8
+E: match
+G: match
+I: eq 4
+J: match
+L: eq 5
+# Dominoes
+40 35 20 44 23 45 62 51 22 13 52

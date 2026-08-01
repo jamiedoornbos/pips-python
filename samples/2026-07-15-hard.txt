@@ -1,0 +1,26 @@
+# Title
+2026-07-15-hard
+# Background
+AA...BCC
+DE...F.G
+DE...HHI
+JKLL.M.I
+JKNN.M.O
+# Constraints
+A: eq 5
+D: eq 9
+E: eq 0
+J: eq 10
+K: eq 2
+L: eq 0
+N: eq 7
+M: eq 4
+H: eq 10
+O: lt 4
+I: eq 10
+G: eq 4
+F: lt 4
+B: eq 4
+C: match
+# Dominoes
+51 13 44 02 54 01 55 00 53 22 04 52 63
