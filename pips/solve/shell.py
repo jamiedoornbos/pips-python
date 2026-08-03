@@ -106,7 +106,7 @@ class ShellSolver(Solver):
         node_id = '/'.join(f'{placement.brief}' for placement in new_state)
         node = self._shell.get_solver_node(node_id)
         if node:
-            return node.status, True
+            return True
 
         data_file = functools.partial(self._shell._data_file, 'nodes', node_id)
         os.makedirs(data_file(), exist_ok=True)
@@ -126,7 +126,7 @@ class ShellSolver(Solver):
         with open(data_file('status=null'), 'w') as fp:
             pass
         self._opened.append(node_id)
-        return 'null', False
+        return False
 
 
 class PuzzleShell:

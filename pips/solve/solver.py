@@ -82,7 +82,7 @@ class Solver(SolverCaches, SolverDebug):
         state_key = _board_state_key([*parent.board.placements, placement])
         existing = self._nodes.get(state_key)
         if existing:
-            return existing, True
+            return True
 
         board = parent.board.copy(reset=False)
         board.place(placement)
@@ -91,4 +91,4 @@ class Solver(SolverCaches, SolverDebug):
             self._open.append([])
         self._open[tier].append(child := Node(board))
         self._nodes[state_key] = child
-        return child, False
+        return False

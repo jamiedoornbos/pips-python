@@ -4,7 +4,7 @@ import re
 import click
 
 import pips.app.models
-from pips.model import Board, BoardStatus, Constraint, Domino, Location, Orientation, Placement, Position
+from pips.model import Board, Constraint, Domino, Location, Orientation, Placement, Position
 from pips.solve.node import Node, SolverCaches, SolverDebug
 from pips.solve.shell import Shell, SolverNodeModel
 from pips.solve.solver import Solver
@@ -103,7 +103,7 @@ def main(puzzle_name: str, start_placements: list[Placement], debug: bool, start
             return debug
 
     class NodeInterceptor(SolverCaches):
-        def add_node(self, parent: Node, placement: Placement) -> tuple[Node | BoardStatus, bool]:
+        def add_node(self, parent: Node, placement: Placement) -> bool:
             print(f'Chosen placement: {placement}')
             if not save_nodes:
                 return solver.add_node(parent, placement)
@@ -112,7 +112,7 @@ def main(puzzle_name: str, start_placements: list[Placement], debug: bool, start
             node_id = get_node_id(new_state)
             node = shell.get_solver_node(puzzle_name, node_id)
             if node:
-                return node.status, True
+                return True
 
             pydantic_placements = [to_pydantic(placement) for placement in new_state]
             node_data = os.path.join(root_dir, node_id)
@@ -127,7 +127,7 @@ def main(puzzle_name: str, start_placements: list[Placement], debug: bool, start
             with open(os.path.join(root_dir, node_id, 'status=null'), 'w') as fp:
                 pass
             print(f'    Saved node {node_id}')
-            return 'null', False
+            return False
 
         def get_constraint(self, loc: Location) -> Constraint | None:
             return solver.get_constraint(loc)

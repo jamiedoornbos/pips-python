@@ -17,10 +17,10 @@ from pips.model import (
 
 
 class SolverCaches:
-    def add_node(self, parent: Node, placement: Placement) -> tuple[Node | BoardStatus, bool]:
+    def add_node(self, parent: Node, placement: Placement) -> bool:
         raise NotImplementedError()
 
-    async def add_node_async(self, parent: Node, placement: Placement) -> tuple[Node | BoardStatus, bool]:
+    async def add_node_async(self, parent: Node, placement: Placement) -> bool:
         raise NotImplementedError()
 
     def get_constraint(self, loc: Location) -> Constraint | None:
@@ -80,9 +80,9 @@ class Node:
         _, to_place = self._expand_using_ranked_locations(solver, debug)
         return to_place
 
-    def _finish_expand(self, placed: list[tuple[Placement, Node, bool]], debug: SolverDebug):
+    def _finish_expand(self, placed: list[tuple[Placement, bool]], debug: SolverDebug):
         child_count = 0
-        for placement, _child, existed in placed:
+        for placement, existed in placed:
             if existed:
                 debug.add_message(
                     self, f'Skipped placement {placement} since it resulted in a board that was already visited'
@@ -98,12 +98,12 @@ class Node:
 
     def expand(self, solver: SolverCaches, debug: SolverDebug):
         to_place = self._compute_placements(solver, debug)
-        new_nodes = [(placement, *solver.add_node(self, placement)) for placement in to_place]
+        new_nodes = [(placement, solver.add_node(self, placement)) for placement in to_place]
         self._finish_expand(new_nodes, debug)
 
     async def expand_async(self, solver: SolverCaches, debug: SolverDebug):
         to_place = self._compute_placements(solver, debug)
-        new_nodes = [(placement, *(await solver.add_node_async(self, placement))) for placement in to_place]
+        new_nodes = [(placement, await solver.add_node_async(self, placement)) for placement in to_place]
         self._finish_expand(new_nodes, debug)
 
     def _expand_using_brute_force(self, solver: SolverCaches, debug: SolverDebug) -> list[Placement]:
@@ -316,7 +316,7 @@ class Node:
                 best_placements = valid_placements
 
         if not best_location:
-            debug.add_message(self, f'No best location found for expansion')
+            debug.add_message(self, 'No best location found for expansion')
             return None, []
 
         return best_location, best_placements
