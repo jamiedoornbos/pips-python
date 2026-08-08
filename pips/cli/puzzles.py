@@ -2,10 +2,13 @@ import asyncio
 import pathlib
 
 import typer
+from sqlalchemy import select
+from tabulate import tabulate
 
 from pips.app import main
 from pips.data.boardtostr import board_to_str
 from pips.db.engine import async_session
+from pips.db.model.solver import Solver
 from pips.db.puzzles import CatalogShell, bytes_to_placements
 from pips.db.solvers import SolverShell
 
@@ -31,6 +34,41 @@ def list_titles():
                 print(title)
 
     run_async(_run())
+
+
+@app.command()
+def list_solvers():
+    """Shows all solvers and information about them."""
+
+    async def run():
+        rows = []
+        async with async_session() as session:
+            solver: Solver
+            for solver in (await session.execute(select(Solver))).scalars():
+                solve_time = (
+                    str(solver.finished_at - solver.started_at) if solver.started_at and solver.finished_at else None
+                )
+                rows.append(
+                    (
+                        solver.puzzle_title,
+                        solver.puzzle_version,
+                        solver.status,
+                        str(solver.started_at),
+                        str(solver.finished_at),
+                        str(solve_time),
+                        solver.iterations,
+                        solver.lock,
+                        solver.error,
+                    )
+                )
+        print(
+            tabulate(
+                rows,
+                headers=['title', 'version', 'status', 'started', 'finished', 'time', 'iterations', 'lock', 'error'],
+            )
+        )
+
+    run_async(run())
 
 
 @app.command()
