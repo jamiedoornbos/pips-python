@@ -200,9 +200,13 @@ class PuzzleVersionShell:
     async def load(self) -> Board:
         return await self.puzzle.load(self.version)
 
-    async def upsert_board(self, board: Board, *new_placements: list[Placement]) -> int:
-        """Inserts the board and returns True if it is new."""
-        placements = placements_to_bytes([*board.placements, *new_placements])
+    async def upsert_board(self, board: Board, *new_placements: list[Placement]) -> PuzzleState:
+        """Inserts or fetches the state matching the board plus new placements and returns the row."""
+        return self.upsert_state(*board.placements, *new_placements)
+
+    async def upsert_state(self, *board_placements: typing.Sequence[Placement]) -> PuzzleState:
+        """Inserts or fetches the state matching the placements and returns the row."""
+        placements = placements_to_bytes(board_placements)
         stmt = (
             pg_insert(PuzzleState)
             .values(puzzle_title=self.title, puzzle_version=self.version, placements=placements)
@@ -210,7 +214,15 @@ class PuzzleVersionShell:
                 index_elements=[PuzzleState.puzzle_title, PuzzleState.puzzle_version, PuzzleState.placements],
                 set_={'placements': placements},  # no-op to fire RETURNING
             )
-            .returning(PuzzleState.id)
+            .returning(PuzzleState)
         )
-        state_id = (await self.session.execute(stmt)).scalar_one()
-        return state_id
+        return (await self.session.execute(stmt)).scalar_one()
+
+    async def get_states(self) -> list[PuzzleState]:
+        return (
+            await self.session.execute(
+                select(PuzzleState).where(
+                    PuzzleState.puzzle_title == self.title, PuzzleState.puzzle_version == self.version
+                )
+            )
+        ).scalars()

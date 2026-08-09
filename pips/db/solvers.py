@@ -5,14 +5,14 @@ import typing
 
 import sqlalchemy
 from sqlalchemy import select
-from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import joinedload
+from sqlalchemy.orm import joinedload, selectinload
 
 from pips.app.models import PlacementModel
+from pips.db.model.puzzle_state import PuzzleState
 from pips.db.model.solver import Solver, SolverStatus
 from pips.db.model.solver_node import SolverNode
-from pips.db.puzzles import CatalogShell, PuzzleVersionShell, bytes_to_placements
+from pips.db.puzzles import CatalogShell, PuzzleVersionShell, bytes_to_placements, placements_to_bytes
 from pips.db.session import async_session
 from pips.model.board import Board, BoardStatus
 from pips.model.placement import Placement
@@ -30,45 +30,64 @@ def _to_model(solver: Solver) -> BackgroundSolveModel:
     )
 
 
-def _get_num_placements(entry: tuple[SolverNode, list[Placement]]):
+def _get_num_placements(entry: tuple[SolverNode, bytes]):
     return entry[0].num_placements
 
 
 class DatabaseNodeOrchestrator(CoreSolver):
-    def __init__(self, board: Board, shell: PuzzleVersionShell, solver: Solver, opened: list[SolverNode]):
+    def __init__(self, board: Board, solver: Solver, all_nodes: list[SolverNode], all_states: list[PuzzleState]):
         super().__init__(board)
-        self._shell = shell
-        self._opened: list[tuple[SolverNode, list[Placement]]] = [
-            (node, bytes_to_placements(node.puzzle_state.placements)) for node in opened
-        ]
         self._solver = solver
+        self._opened: list[tuple[SolverNode, bytes]] = [
+            (node, node.puzzle_state.placements) for node in all_nodes if node.status == 'unvisited'
+        ]
+        self._new: list[SolverNode] = []
 
-    def pop_open(self) -> tuple[SolverNode, list[Placement]] | tuple[None, None]:
+        nodes = {node.puzzle_state.placements: node for node in all_nodes}
+        self._cache: dict[bytes, tuple[SolverNode | None, PuzzleState | int]] = {
+            state.placements: (nodes.get(state.placements), state.id) for state in all_states
+        }
+
+    def pop_open(self) -> SolverNode | None:
         self._opened.sort(key=_get_num_placements, reverse=True)
         if not self._opened:
             return None, None
         return self._opened.pop()
 
-    async def add_node_async(self, parent: Node, placement: Placement):
-        session = self._shell.session
-        state_id = await self._shell.upsert_board(parent.board, placement)
-        try:
-            async with session.begin_nested():
-                session.add(
-                    node := SolverNode(
-                        solver_id=self._solver.id,
-                        puzzle_state_id=state_id,
-                        num_placements=len(parent.board.placements) + 1,
+    def add_node(self, parent: Node, placement: Placement):
+        if cached := self._cache.get(placements_bytes := placements_to_bytes([*parent.board.placements, placement])):
+            child, state_or_id = cached
+            if child:
+                return True
+
+            kwargs = {'puzzle_state' if isinstance(cached, PuzzleState) else 'puzzle_state_id': state_or_id}
+        else:
+            kwargs = {
+                'puzzle_state': (
+                    state_or_id := PuzzleState(
+                        puzzle=self._solver.puzzle,
+                        placements=placements_bytes,
                     )
                 )
-            self._opened.append((node, [*parent.board.placements, placement]))
-            return node.status, False
-        except IntegrityError:
-            query = select(SolverNode).where(
-                SolverNode.solver_id == self._solver.id, SolverNode.puzzle_state_id == state_id
-            )
-            node = (await session.execute(query)).scalar_one()
-            return node.status, True
+            }
+
+        self._new.append(
+            child := SolverNode(num_placements=len(parent.board.placements) + 1, solver=self._solver, **kwargs)
+        )
+        self._cache[placements_bytes] = (child, state_or_id)
+        self._opened.append((child, placements_bytes))
+        return False
+
+    def flush(self) -> list[SolverNode]:
+        nodes = self._new
+        self._new = []
+        return nodes
+
+
+class RunStepsResult(typing.NamedTuple):
+    iterations: int
+    solutions: int
+    completed: bool
 
 
 class SolverShell:
@@ -127,7 +146,9 @@ class SolverShell:
         return (
             (
                 await self.session.execute(
-                    select(Solver).where(Solver.puzzle_title == title, Solver.puzzle_version == version)
+                    select(Solver)
+                    .where(Solver.puzzle_title == title, Solver.puzzle_version == version)
+                    .options(selectinload(Solver.puzzle))
                 )
             )
             .scalars()
@@ -142,7 +163,6 @@ class SolverShell:
     async def init_solver(self) -> BackgroundSolveModel:
         title = self.puzzle.title
         version = self.puzzle.version
-        state_id = await self.puzzle.upsert_board(await self.puzzle.load())
         try:
             self.session.add_all(
                 [
@@ -150,7 +170,7 @@ class SolverShell:
                     SolverNode(
                         num_placements=0,
                         solver=solver,
-                        puzzle_state_id=state_id,
+                        puzzle_state=await self.puzzle.upsert_state(),
                     ),
                 ]
             )
@@ -172,19 +192,46 @@ class SolverShell:
             if solver.lock:
                 raise RuntimeError(f'Solver already active for {self.title}')
 
+            if solver.status not in (SolverStatus.NOT_RUN, SolverStatus.ERROR):
+                raise RuntimeError(f'Solver already completed for {self.title}')
+
             # TODO: use FOR UPDATE and prevent race condition
             solver.lock = True
             await self.session.commit()
 
-            solutions = await self.get_nodes('won')
-            logger.info(f'Starting solve for {self.title} version {self.version} - {len(solutions)} solutions')
+            all_nodes = await self.get_nodes()
+            solutions = sum(1 for node in all_nodes if node.status == 'won')
+            iterations = solver.iterations
+            logger.info(
+                f'Starting solve for {self.title} version {self.version} - {solutions=} and {iterations=} '
+                f'all_nodes={len(all_nodes)}'
+            )
+
+            finished = False
+            board = await self.puzzle.load()
+            orchestrator = DatabaseNodeOrchestrator(board, solver, all_nodes, await self.puzzle.get_states())
+            del all_nodes
+
+            flush_task: asyncio.Future | None = None
+
+            async def flush(final: bool = False):
+                nonlocal flush_task
+                if flush_task and not flush_task.done():
+                    logger.warning(f'Awaiting last save ({self.title} version {self.version})')
+                    await flush_task
+                self.session.add_all(orchestrator.flush())
+                flush_task = asyncio.create_task(self.session.commit())
+                if final:
+                    await flush_task
 
             try:
                 while True:
                     if cancel_event.is_set():
-                        return
-                    more_solutions, finished = await self.run_steps(solver, cancel_event, 100)
-                    solutions.extend(more_solutions)
+                        break
+                    iterations, new_solutions, finished = await self.run_steps(orchestrator, cancel_event, 1000)
+                    solver.iterations += iterations
+                    solutions += new_solutions
+                    await flush()
                     if finished:
                         break
                 error = None
@@ -192,18 +239,25 @@ class SolverShell:
                 logger.exception(f'An error occured during solve for {self.title}')
                 error = str(ex)
 
-            solver.finished_at = datetime.datetime.now(tz=datetime.UTC)
+            solver.finished_at = datetime.datetime.now(tz=datetime.UTC) if finished else None
             solver.error = error
             solver.status = (
-                SolverStatus.ERROR if error else SolverStatus.SOLVED if solutions else SolverStatus.NO_SOLUTIONS
+                SolverStatus.ERROR
+                if error
+                else SolverStatus.NOT_RUN
+                if not finished
+                else SolverStatus.SOLVED
+                if solutions
+                else SolverStatus.NO_SOLUTIONS
             )
-            await self.session.commit()
+            await flush(final=True)
 
             logger.info(f'Finished background solve for {self.title} after {solver.iterations} iterations')
         except:
             await self.session.rollback()
             raise
         finally:
+            await self.session.rollback()
             solver = await self.load()
             solver.lock = False
             await self.session.commit()
@@ -227,24 +281,23 @@ class SolverShell:
             query = query.where(SolverNode.status == status)
         return (await self.session.execute(query)).scalars().all()
 
-    async def run_steps(self, solver: Solver, cancel_event: asyncio.Event, count: int) -> tuple[list[SolverNode], bool]:
-        board = await self.puzzle.load()
-        orchestrator = DatabaseNodeOrchestrator(board, self.puzzle, solver, await self.get_nodes('unvisited'))
-        new_solutions = []
+    async def run_steps(
+        self, orchestrator: DatabaseNodeOrchestrator, cancel_event: asyncio.Event, count: int
+    ) -> RunStepsResult:
+        iterations, solutions = 0, 0
 
         for _ in range(count):
-            current_node, placements = orchestrator.pop_open()
+            current_node, placement_bytes = orchestrator.pop_open()
             if not current_node or cancel_event.is_set():
                 break
             board = orchestrator.board.copy(reset=False)
-            for placement in placements:
+            for placement in bytes_to_placements(placement_bytes):
                 board.place(placement)
             node = Node(board)
-            await node.expand_async(orchestrator, orchestrator)
+            node.expand(orchestrator, orchestrator)
             current_node.status = node.status
             if node.status == 'won':
-                new_solutions.append(current_node)
-            solver.iterations += 1
-            await self.session.commit()
+                solutions += 1
+            iterations += 1
 
-        return new_solutions, current_node is None
+        return RunStepsResult(iterations, solutions, current_node is None)
