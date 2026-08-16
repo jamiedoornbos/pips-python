@@ -69,7 +69,7 @@ def puzzle_to_board(puzzle: Puzzle) -> Board:
             )
             for con in puzzle.constraints
         ),
-        [int_to_domino(dom) for dom in puzzle.dominoes],
+        tuple(int_to_domino(dom) for dom in puzzle.dominoes),
     )
 
 
@@ -146,23 +146,26 @@ class PuzzleShell:
     def version(self, version: int) -> PuzzleVersionShell:
         return PuzzleVersionShell(self, version)
 
-    async def latest_version(self) -> PuzzleVersionShell:
+    async def latest_version(self) -> PuzzleVersionShell | None:
         query = select(func.max(Puzzle.version)).where(Puzzle.title == self.title)
-        version = (await self.session.execute(query)).scalar()
+        if (version := (await self.session.execute(query)).scalar()) is None:
+            return None
         return self.version(version)
 
-    async def versions(self) -> list[datetime, int]:
+    async def versions(self) -> list[tuple[datetime, int]]:
         query = select(Puzzle).where(Puzzle.title == self.title).order_by(Puzzle.version.asc())
-        puzzles: list[Puzzle] = (await self.session.execute(query)).scalars().all()
+        puzzles = (await self.session.execute(query)).scalars().all()
         return [(puzzle.created_at, puzzle.version) for puzzle in puzzles]
 
-    async def load(self, version: int | None = None) -> Board:
+    async def load(self, version: int | None = None) -> Board | None:
         if version is not None:
             puzzle = await self.session.get(Puzzle, (self.title, version))
         else:
             query, LatestPuzzle = _latest_versions()
             query = query.where(LatestPuzzle.title == self.title)
             puzzle = (await self.session.execute(query)).scalars().first()
+        if puzzle is None:
+            return None
         return puzzle_to_board(puzzle)
 
     async def save_new(self, board: Board) -> Board:
@@ -173,10 +176,12 @@ class PuzzleShell:
         return puzzle_to_board(puzzle)
 
     async def update(self, board: Board) -> tuple[Board, int]:
-        version_query = select(func.max(Puzzle.version)).where(Puzzle.title == self.title)
+        version = await self.session.scalar(select(func.max(Puzzle.version)).where(Puzzle.title == self.title))
+        if version is None:
+            raise RuntimeError(f'Puzzle {self.title} not found')
         puzzle = Puzzle(
             title=self.title,
-            version=(await self.session.scalar(version_query)) + 1,
+            version=version + 1,
         )
         board_to_puzzle(board, puzzle)
         self.session.add(puzzle)
@@ -197,14 +202,14 @@ class PuzzleVersionShell:
     def title(self) -> str:
         return self.puzzle.title
 
-    async def load(self) -> Board:
+    async def load(self) -> Board | None:
         return await self.puzzle.load(self.version)
 
-    async def upsert_board(self, board: Board, *new_placements: list[Placement]) -> PuzzleState:
+    async def upsert_board(self, board: Board, *new_placements: Placement) -> PuzzleState:
         """Inserts or fetches the state matching the board plus new placements and returns the row."""
-        return self.upsert_state(*board.placements, *new_placements)
+        return await self.upsert_state(*board.placements, *new_placements)
 
-    async def upsert_state(self, *board_placements: typing.Sequence[Placement]) -> PuzzleState:
+    async def upsert_state(self, *board_placements: Placement) -> PuzzleState:
         """Inserts or fetches the state matching the placements and returns the row."""
         placements = placements_to_bytes(board_placements)
         stmt = (
@@ -218,11 +223,15 @@ class PuzzleVersionShell:
         )
         return (await self.session.execute(stmt)).scalar_one()
 
-    async def get_states(self) -> list[PuzzleState]:
+    async def get_states(self) -> typing.Sequence[PuzzleState]:
         return (
+            (
             await self.session.execute(
                 select(PuzzleState).where(
                     PuzzleState.puzzle_title == self.title, PuzzleState.puzzle_version == self.version
                 )
             )
-        ).scalars()
+            )
+            .scalars()
+            .all()
+        )

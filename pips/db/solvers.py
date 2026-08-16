@@ -37,7 +37,11 @@ def _get_num_placements(entry: tuple[SolverNode, bytes]):
 
 class DatabaseNodeOrchestrator(CoreSolver):
     def __init__(
-        self, board: Board, solver: Solver, all_nodes: typing.Sequence[SolverNode], all_states: list[PuzzleState]
+        self,
+        board: Board,
+        solver: Solver,
+        all_nodes: typing.Sequence[SolverNode],
+        all_states: typing.Sequence[PuzzleState],
     ):
         super().__init__(board)
         self._solver = solver
@@ -214,6 +218,7 @@ class SolverShell:
 
             finished = False
             board = await self.puzzle.load()
+            assert board
             orchestrator = DatabaseNodeOrchestrator(board, solver, all_nodes, await self.puzzle.get_states())
             del all_nodes
 

@@ -67,11 +67,17 @@ async def update_puzzle(
     return PuzzleModel.from_board(board)
 
 
+async def _solver_shell(catalog: CatalogShell, puzzle_name: str) -> SolverShell:
+    if (version := await catalog.puzzle(puzzle_name).latest_version()) is None:
+        raise HTTPException(404, f'Puzzle {puzzle_name} not found')
+    return SolverShell(version)
+
+
 @app.get('/api/puzzles/{puzzle_name}/solverJob')
 async def get_solver_job(
     puzzle_name: str, catalog: CatalogShell = Depends(CatalogShell)
 ) -> BackgroundSolveModel | None:
-    shell = SolverShell(await catalog.puzzle(puzzle_name).latest_version())
+    shell = await _solver_shell(catalog, puzzle_name)
     solver = await shell.load()
     if not solver or not solver.lock:
         return None
@@ -82,7 +88,7 @@ async def get_solver_job(
 
 @app.post('/api/puzzles/{puzzle_name}/solverJob')
 async def start_solver_job(puzzle_name: str, catalog: CatalogShell = Depends(CatalogShell)) -> BackgroundSolveModel:
-    shell = SolverShell(await catalog.puzzle(puzzle_name).latest_version())
+    shell = await _solver_shell(catalog, puzzle_name)
     await shell.init_solver()
     solver = await shell.load()
 
@@ -97,7 +103,7 @@ async def start_solver_job(puzzle_name: str, catalog: CatalogShell = Depends(Cat
 
 @app.get('/api/puzzles/{puzzle_name}/solverResult')
 async def get_solver_result(puzzle_name, catalog: CatalogShell = Depends(CatalogShell)) -> SolverResultModel | None:
-    solver = SolverShell(await catalog.puzzle(puzzle_name).latest_version())
+    solver = await _solver_shell(catalog, puzzle_name)
     return await solver.get_result()
 
 
@@ -108,7 +114,7 @@ async def get_solver_node_ids(puzzle_name) -> list[str]:
 
 @app.get('/api/puzzles/{puzzle_name}/solverNodes/solutions')
 async def get_won_node_ids(puzzle_name: str, catalog: CatalogShell = Depends(CatalogShell)) -> list[str]:
-    solver = SolverShell(await catalog.puzzle(puzzle_name).latest_version())
+    solver = await _solver_shell(catalog, puzzle_name)
     nodes = await solver.get_nodes('won')
     return [f'A{node.id}' for node in nodes]
 
