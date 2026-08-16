@@ -34,7 +34,7 @@ class PuzzleModel(BaseModel):
 class PlacementModel(BaseModel):
     domino: Domino
     loc: Location
-    dir: Annotated[Orientation, BeforeValidator(Orientation.lookup_by_name)]
+    dir: Orientation
 
     @field_serializer('dir')
     def serialize_type(self, dir: Orientation, _info):

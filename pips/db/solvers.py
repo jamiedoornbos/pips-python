@@ -130,7 +130,7 @@ class SolverShell:
         for solution in await self.get_nodes('won'):
             solutions.append(
                 [
-                    PlacementModel(domino=placement.domino, loc=placement.pos.loc, dir=placement.pos.dir.value.name)
+                    PlacementModel(domino=placement.domino, loc=placement.pos.loc, dir=placement.pos.dir)
                     for placement in bytes_to_placements(solution.puzzle_state.placements)
                 ]
             )

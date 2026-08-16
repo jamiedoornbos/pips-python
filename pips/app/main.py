@@ -123,7 +123,7 @@ async def get_solver_node(
         id=f'A{node.id}',
         status=node.status,
         placements=[
-            PlacementModel(domino=placement.domino, loc=placement.pos.loc, dir=placement.pos.dir.value.name)
+            PlacementModel(domino=placement.domino, loc=placement.pos.loc, dir=placement.pos.dir)
             for placement in bytes_to_placements(node.puzzle_state.placements)
         ],
     )

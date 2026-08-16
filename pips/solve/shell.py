@@ -116,7 +116,7 @@ class ShellSolver(Solver):
             id=node_id,
             status='null',
             placements=[
-                models.PlacementModel(domino=placement.domino, loc=placement.pos.loc, dir=placement.pos.dir.value.name)
+                models.PlacementModel(domino=placement.domino, loc=placement.pos.loc, dir=placement.pos.dir)
                 for placement in new_state
             ],
         )
