@@ -12,10 +12,10 @@ from sqlalchemy.orm import joinedload, selectinload
 from pips.app.models import PlacementModel
 from pips.db.model.puzzle_state import PuzzleState
 from pips.db.model.solver import Solver, SolverStatus
-from pips.db.model.solver_node import SolverNode
+from pips.db.model.solver_node import SolverNode, SolverNodeStatus
 from pips.db.puzzles import CatalogShell, PuzzleVersionShell, bytes_to_placements, placements_to_bytes
 from pips.db.session import async_session
-from pips.model.board import Board, BoardStatus
+from pips.model.board import Board
 from pips.model.placement import Placement
 from pips.solve.shell import BackgroundSolveModel, SolverResultModel
 from pips.solve.solver import Node
@@ -46,7 +46,7 @@ class DatabaseNodeOrchestrator(CoreSolver):
         super().__init__(board)
         self._solver = solver
         self._opened: list[tuple[SolverNode, bytes]] = [
-            (node, node.puzzle_state.placements) for node in all_nodes if node.status == 'unvisited'
+            (node, node.puzzle_state.placements) for node in all_nodes if node.status == SolverNodeStatus.UNVISITED
         ]
         self._new: list[SolverNode] = []
 
@@ -131,7 +131,7 @@ class SolverShell:
         assert solver.finished_at is not None  # guaranteed once status is SOLVED
 
         solutions = []
-        for solution in await self.get_nodes('won'):
+        for solution in await self.get_solutions():
             solutions.append(
                 [
                     PlacementModel(domino=placement.domino, loc=placement.pos.loc, dir=placement.pos.dir)
@@ -209,7 +209,7 @@ class SolverShell:
             await self.session.commit()
 
             all_nodes = await self.get_nodes()
-            solutions = sum(1 for node in all_nodes if node.status == 'won')
+            solutions = sum(1 for node in all_nodes if node.status == SolverNodeStatus.WON)
             iterations = solver.iterations
             logger.info(
                 f'Starting solve for {self.title} version {self.version} - {solutions=} and {iterations=} '
@@ -285,9 +285,10 @@ class SolverShell:
             .where(Solver.puzzle_title == self.title, Solver.puzzle_version == self.version)
         )
 
-    async def get_nodes(
-        self, status: BoardStatus | typing.Literal['not_visited'] | None = None
-    ) -> typing.Sequence[SolverNode]:
+    async def get_solutions(self) -> typing.Sequence[SolverNode]:
+        return await self.get_nodes(SolverNodeStatus.WON)
+
+    async def get_nodes(self, status: SolverNodeStatus | None = None) -> typing.Sequence[SolverNode]:
         query = self._my_nodes().options(joinedload(SolverNode.puzzle_state))
         if status:
             query = query.where(SolverNode.status == status)
@@ -307,10 +308,16 @@ class SolverShell:
                 board.place(placement)
             node = Node(board)
             node.expand(orchestrator, orchestrator)
-            assert node.status
-            current_node.status = node.status
-            if node.status == 'won':
-                solutions += 1
+            match node.status:
+                case 'won':
+                    current_node.status = SolverNodeStatus.WON
+                    solutions += 1
+                case 'lost':
+                    current_node.status = SolverNodeStatus.LOST
+                case 'incomplete':
+                    current_node.status = SolverNodeStatus.INCOMPLETE
+                case _:
+                    assert False, f'Unexpected status {node.status}'
             iterations += 1
 
         return RunStepsResult(iterations, solutions, current_node is None)

@@ -226,11 +226,11 @@ class PuzzleVersionShell:
     async def get_states(self) -> typing.Sequence[PuzzleState]:
         return (
             (
-            await self.session.execute(
-                select(PuzzleState).where(
-                    PuzzleState.puzzle_title == self.title, PuzzleState.puzzle_version == self.version
+                await self.session.execute(
+                    select(PuzzleState).where(
+                        PuzzleState.puzzle_title == self.title, PuzzleState.puzzle_version == self.version
+                    )
                 )
-            )
             )
             .scalars()
             .all()

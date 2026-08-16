@@ -115,11 +115,11 @@ async def get_solver_node_ids(puzzle_name) -> list[str]:
 @app.get('/api/puzzles/{puzzle_name}/solverNodes/solutions')
 async def get_won_node_ids(puzzle_name: str, catalog: CatalogShell = Depends(CatalogShell)) -> list[str]:
     solver = await _solver_shell(catalog, puzzle_name)
-    nodes = await solver.get_nodes('won')
+    nodes = await solver.get_solutions()
     return [f'A{node.id}' for node in nodes]
 
 
-@app.get('/api/puzzles/{puzzle_name}/solverNodes/{node_id:path}')
+@app.get('/api/puzzles/{puzzle_name}/solverNodes/{node_id}')
 async def get_solver_node(
     puzzle_name: str, node_id: str, catalog: CatalogShell = Depends(CatalogShell)
 ) -> SolverNodeModel:
@@ -127,7 +127,7 @@ async def get_solver_node(
     return SolverNodeModel(
         puzzle_name=node.solver.puzzle_title,
         id=f'A{node.id}',
-        status=node.status,
+        status=node.status.value,
         placements=[
             PlacementModel(domino=placement.domino, loc=placement.pos.loc, dir=placement.pos.dir)
             for placement in bytes_to_placements(node.puzzle_state.placements)
