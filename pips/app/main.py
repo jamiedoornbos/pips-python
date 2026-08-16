@@ -53,7 +53,7 @@ async def get_puzzle_names(catalog: CatalogShell = Depends(CatalogShell)) -> lis
 async def get_puzzle(puzzle_name, catalog: CatalogShell = Depends(CatalogShell)) -> PuzzleModel:
     if not (board := await catalog.puzzle(puzzle_name).load()):
         raise HTTPException(404, 'Puzzle not found')
-    return board
+    return PuzzleModel.from_board(board)
 
 
 @app.post('/api/puzzles/{puzzle_name}')
@@ -64,7 +64,7 @@ async def update_puzzle(
     if not await shell.load():
         raise HTTPException(404, 'Puzzle not found')
     board, _version = await shell.update(puzzle.to_board())
-    return board
+    return PuzzleModel.from_board(board)
 
 
 @app.get('/api/puzzles/{puzzle_name}/solverJob')
@@ -139,4 +139,4 @@ async def test_select(session: AsyncSession = Depends(get_session)):
 async def create_puzzle(
     title: Annotated[str, Body()], puzzle: PuzzleModel, catalog: CatalogShell = Depends(CatalogShell)
 ) -> PuzzleModel:
-    return await catalog.puzzle(title).save_new(puzzle.to_board())
+    return PuzzleModel.from_board(await catalog.puzzle(title).save_new(puzzle.to_board()))

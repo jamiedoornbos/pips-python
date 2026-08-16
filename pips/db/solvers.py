@@ -4,6 +4,7 @@ import logging
 import typing
 
 import sqlalchemy
+import sqlalchemy.exc
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload, selectinload
@@ -35,7 +36,9 @@ def _get_num_placements(entry: tuple[SolverNode, bytes]):
 
 
 class DatabaseNodeOrchestrator(CoreSolver):
-    def __init__(self, board: Board, solver: Solver, all_nodes: list[SolverNode], all_states: list[PuzzleState]):
+    def __init__(
+        self, board: Board, solver: Solver, all_nodes: typing.Sequence[SolverNode], all_states: list[PuzzleState]
+    ):
         super().__init__(board)
         self._solver = solver
         self._opened: list[tuple[SolverNode, bytes]] = [
@@ -48,7 +51,7 @@ class DatabaseNodeOrchestrator(CoreSolver):
             state.placements: (nodes.get(state.placements), state.id) for state in all_states
         }
 
-    def pop_open(self) -> SolverNode | None:
+    def pop_open(self) -> tuple[SolverNode | None, bytes | None]:
         self._opened.sort(key=_get_num_placements, reverse=True)
         if not self._opened:
             return None, None
@@ -121,6 +124,8 @@ class SolverShell:
         if not solver or solver.status != SolverStatus.SOLVED:
             return None
 
+        assert solver.finished_at is not None  # guaranteed once status is SOLVED
+
         solutions = []
         for solution in await self.get_nodes('won'):
             solutions.append(
@@ -152,7 +157,7 @@ class SolverShell:
                 )
             )
             .scalars()
-            .first()
+            .one()
         )
 
     async def reset_solver(self) -> None:
@@ -275,7 +280,9 @@ class SolverShell:
             .where(Solver.puzzle_title == self.title, Solver.puzzle_version == self.version)
         )
 
-    async def get_nodes(self, status: BoardStatus | typing.Literal['not_visited'] | None = None) -> list[SolverNode]:
+    async def get_nodes(
+        self, status: BoardStatus | typing.Literal['not_visited'] | None = None
+    ) -> typing.Sequence[SolverNode]:
         query = self._my_nodes().options(joinedload(SolverNode.puzzle_state))
         if status:
             query = query.where(SolverNode.status == status)
@@ -288,13 +295,14 @@ class SolverShell:
 
         for _ in range(count):
             current_node, placement_bytes = orchestrator.pop_open()
-            if not current_node or cancel_event.is_set():
+            if not (current_node and placement_bytes) or cancel_event.is_set():
                 break
             board = orchestrator.board.copy(reset=False)
             for placement in bytes_to_placements(placement_bytes):
                 board.place(placement)
             node = Node(board)
             node.expand(orchestrator, orchestrator)
+            assert node.status
             current_node.status = node.status
             if node.status == 'won':
                 solutions += 1

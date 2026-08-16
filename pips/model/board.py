@@ -18,12 +18,12 @@ class Board(BoardState):
     def __init__(
         self,
         background: LocationSet,
-        constraints: tuple[Constraint],
-        dominoes: tuple[Domino],
+        constraints: typing.Sequence[Constraint],
+        dominoes: tuple[Domino, ...],
     ):
         self.background: LocationSet = background
         self.constraints: typing.Sequence[Constraint] = constraints
-        self.all_dominoes: tuple[Domino] = dominoes
+        self.all_dominoes: tuple[Domino, ...] = dominoes
         self._remaining_dominoes: list[Domino] = list(dominoes)
         self._placements: list[Placement] = []
         self._empty_locations: LocationSet = background

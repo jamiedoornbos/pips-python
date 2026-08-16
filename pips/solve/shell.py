@@ -138,7 +138,7 @@ class PuzzleShell:
     def board_file(self) -> str:
         return os.path.join(self._shell.samples_dir, f'{self._puzzle_name}.txt')
 
-    def _data_file(self, *names: tuple[str, ...]):
+    def _data_file(self, *names: str):
         return self._shell._data_file(self._puzzle_name, *names)
 
     def set_result_status(self, status: ResultStatus):
@@ -199,6 +199,11 @@ class PuzzleShell:
         with open(node_path) as fp:
             return SolverNodeModel.model_validate_json(fp.read())
 
+    def require_solver_node(self, node_id: str) -> SolverNodeModel:
+        node = self.get_solver_node(node_id)
+        assert node
+        return node
+
     def init_background_solve(self) -> BackgroundSolveModel:
         lock_file = self._data_file('nodes', 'bgsolve.lock')
         os.makedirs(os.path.dirname(lock_file), exist_ok=True)
@@ -245,9 +250,11 @@ class PuzzleShell:
 
     def _background_solve(self, shutdown_event: threading.Event):
         job = self._load_bg_job()
+        assert job
         job.thread = threading.current_thread().name
         solutions = [
-            node.placements for node in [self.get_solver_node(node_id) for node_id in (self.get_solver_node_ids('won'))]
+            node.placements
+            for node in [self.require_solver_node(node_id) for node_id in (self.get_solver_node_ids('won'))]
         ]
         logger.info(
             f'Starting background solve for {self._puzzle_name} thread {job.thread}, {len(solutions)} solutions so far'
@@ -309,7 +316,7 @@ class PuzzleShell:
             pass
         logger.debug(f'Upated start node {node.id} with status={node.status}')
 
-    def run_steps(self, job: BackgroundSolveModel, count: int) -> bool:
+    def run_steps(self, job: BackgroundSolveModel, count: int) -> tuple[list[list[models.PlacementModel]], bool]:
         solver = ShellSolver(self)
         current_node_id = solver.pop_open()
         save_node = True
@@ -319,7 +326,7 @@ class PuzzleShell:
             current_node = SolverNodeModel(puzzle_name=self._puzzle_name, id='', status='incomplete', placements=[])
             save_node = False
         else:
-            current_node = self.get_solver_node(current_node_id)
+            current_node = self.require_solver_node(current_node_id)
 
         # board = self.get_board()
         # start_node = self._find_next_open_node()
@@ -340,6 +347,7 @@ class PuzzleShell:
                 board.place(Placement(Domino(*placement.domino), Position(Location(*placement.loc), placement.dir)))
             node = Node(board)
             node.expand(solver, solver)
+            assert node.status
             if save_node:
                 self._set_node_status(current_node, node.status)
             if node.status == 'won':
@@ -348,7 +356,7 @@ class PuzzleShell:
             self._save_bg_job(job)
             if not (current_node_id := solver.pop_open()):
                 break
-            current_node = self.get_solver_node(current_node_id)
+            current_node = self.require_solver_node(current_node_id)
             save_node = True
 
         return new_solutions, current_node_id is None

@@ -26,6 +26,10 @@ class PuzzleModel(BaseModel):
             dominoes=tuple(self.all_dominoes),
         )
 
+    @classmethod
+    def from_board(cls, board: Board) -> PuzzleModel:
+        return cls.model_validate(board, from_attributes=True)
+
 
 class PlacementModel(BaseModel):
     domino: Domino
