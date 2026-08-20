@@ -166,7 +166,7 @@ def show_solver(title: str, version: int | None = None, with_nodes: bool = False
 
 @app.command()
 def show_node(node_id: int):
-    """Shows solver of a puzzle title."""
+    """Shows a solver node."""
 
     async def run():
         async with async_session() as session:
@@ -184,6 +184,32 @@ def show_node(node_id: int):
                 print(f'   placements ({len(placements := bytes_to_placements(node.puzzle_state.placements))}):')
                 for placement in placements:
                     print(f'       {placement}')
+
+    run_async(run())
+
+
+@app.command()
+def show_node_expansion(title: str, version: int | None = None, node_id: int = 0):
+    """Shows a solver node's expansions."""
+
+    async def run():
+        async with async_session() as session:
+            puzzle = await CatalogShell(session).puzzle(title).latest_version()
+            if not puzzle:
+                print(f'Puzzle {title} not found')
+                return
+            node = SolverShell(puzzle).node(node_id)
+            expansions = await node.load_expansion()
+            print(f'Id: {expansions.id}')
+            print(f'Version: {puzzle.version}')
+            print(f'Status: {expansions.status}')
+            print(f'Has solution: {expansions.has_solution}')
+            print('Placements:')
+            for placement in expansions.placements:
+                print(f'    {placement}')
+            print('Children:')
+            for child in expansions.children:
+                print(f'    {child.id}: {child.status} {child.has_solution} {child.placement}')
 
     run_async(run())
 

@@ -37,7 +37,8 @@ def domino_to_int(domino: Domino) -> int:
 
 
 def int_to_domino(dom: int) -> Domino:
-    return Domino(dom >> 4, dom & 0xF)
+    left, right = dom >> 4, dom & 0xF
+    return Domino(left, right)
 
 
 def board_to_puzzle(board: Board, puzzle: Puzzle):

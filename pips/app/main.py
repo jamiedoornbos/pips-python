@@ -5,9 +5,11 @@ from typing import Annotated
 
 import cachetools
 import sqlalchemy as sa
-from fastapi import Body, Depends, FastAPI, HTTPException
+from fastapi import Body, Depends, FastAPI, HTTPException, Request
+from fastapi.responses import JSONResponse
+from sqlalchemy.exc import NoResultFound
 
-from pips.app.models import PlacementModel, PuzzleModel
+from pips.app.models import PlacementModel, PuzzleModel, SolverNodeExpansionChildModel, SolverNodeExpansionModel
 from pips.db.puzzles import CatalogShell, bytes_to_placements
 from pips.db.session import AsyncSession, get_session
 from pips.db.solvers import SolverShell
@@ -36,6 +38,11 @@ shell = Shell('samples', 'local-data/puzzles', {'template'})
 @cachetools.cached(cache=cachetools.TTLCache(maxsize=10, ttl=60))
 def cache() -> dict[str, tuple[Board, ResultStatus]]:
     return shell.get_boards()
+
+
+@app.exception_handler(NoResultFound)
+async def no_result_found_handler(request: Request, exc: NoResultFound) -> JSONResponse:
+    raise HTTPException(404, 'not found')
 
 
 @app.get('/')
@@ -79,8 +86,9 @@ async def get_solver_job(
 ) -> BackgroundSolveModel | None:
     shell = await _solver_shell(catalog, puzzle_name)
     solver = await shell.load()
-    if not solver or not solver.lock:
-        return None
+    if not solver.lock:
+        raise HTTPException(404, 'not found')
+
     return BackgroundSolveModel(
         thread='', iterations=solver.iterations, start_time=solver.started_at, output=[], is_running=True
     )
@@ -128,9 +136,29 @@ async def get_solver_node(
         puzzle_name=node.solver.puzzle_title,
         id=f'A{node.id}',
         status=node.status.value,
-        placements=[
-            PlacementModel(domino=placement.domino, loc=placement.pos.loc, dir=placement.pos.dir)
-            for placement in bytes_to_placements(node.puzzle_state.placements)
+        placements=list(map(PlacementModel.from_placement, bytes_to_placements(node.puzzle_state.placements))),
+    )
+
+
+@app.get('/api/puzzles/{puzzle_name}/solverNodes/{node_id}/expansion')
+async def get_solver_node_expansion(
+    puzzle_name: str, node_id: int, catalog: CatalogShell = Depends(CatalogShell)
+) -> SolverNodeExpansionModel:
+    solver = await _solver_shell(catalog, puzzle_name)
+    expansion = await solver.node(node_id).load_expansion()
+    return SolverNodeExpansionModel(
+        id=expansion.id,
+        status=expansion.status.value,
+        has_solution=expansion.has_solution,
+        placements=list(map(PlacementModel.from_placement, expansion.placements)),
+        children=[
+            SolverNodeExpansionChildModel(
+                id=child.id,
+                status=child.status.value,
+                has_solution=child.has_solution,
+                placement=PlacementModel.from_placement(child.placement),
+            )
+            for child in expansion.children
         ],
     )
 

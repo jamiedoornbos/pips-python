@@ -7,7 +7,7 @@ import sqlalchemy
 import sqlalchemy.exc
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import joinedload, selectinload
+from sqlalchemy.orm import contains_eager, joinedload, selectinload
 
 from pips.app.models import PlacementModel
 from pips.db.model.puzzle_state import PuzzleState
@@ -55,10 +55,10 @@ class DatabaseNodeOrchestrator(CoreSolver):
             state.placements: (nodes.get(state.placements), state.id) for state in all_states
         }
 
-    def pop_open(self) -> tuple[SolverNode | None, bytes | None]:
+    def pop_open(self) -> tuple[SolverNode | None, bytes]:
         self._opened.sort(key=_get_num_placements, reverse=True)
         if not self._opened:
-            return None, None
+            return None, b''
         return self._opened.pop()
 
     def add_node(self, parent: Node, placement: Placement):
@@ -163,6 +163,9 @@ class SolverShell:
             .scalars()
             .one()
         )
+
+    def node(self, node_id: int) -> SolverNodeShell:
+        return SolverNodeShell(self, node_id)
 
     async def reset_solver(self) -> None:
         solver = await self.load()
@@ -301,7 +304,7 @@ class SolverShell:
 
         for _ in range(count):
             current_node, placement_bytes = orchestrator.pop_open()
-            if not (current_node and placement_bytes) or cancel_event.is_set():
+            if not current_node or cancel_event.is_set():
                 break
             board = orchestrator.board.copy(reset=False)
             for placement in bytes_to_placements(placement_bytes):
@@ -321,3 +324,89 @@ class SolverShell:
             iterations += 1
 
         return RunStepsResult(iterations, solutions, current_node is None)
+
+
+class ChildExpansion(typing.NamedTuple):
+    id: int
+    status: SolverNodeStatus
+    has_solution: bool
+    placement: Placement
+
+
+class NodeExpansion(typing.NamedTuple):
+    id: int
+    status: SolverNodeStatus
+    has_solution: bool
+    placements: frozenset[Placement]
+    children: typing.Sequence[ChildExpansion]
+
+
+class SolverNodeShell:
+    def __init__(self, solver: SolverShell, node_id: int):
+        self.solver = solver
+        self.node_id = node_id
+
+    @property
+    def session(self) -> AsyncSession:
+        return self.solver.session
+
+    @property
+    def title(self) -> str:
+        return self.solver.title
+
+    @property
+    def version(self) -> int:
+        return self.solver.version
+
+    @staticmethod
+    def _to_set(node: SolverNode):
+        return frozenset(bytes_to_placements(node.puzzle_state.placements))
+
+    async def load_expansion(self) -> NodeExpansion:
+        all_nodes_query = (
+            select(SolverNode)
+            .join(SolverNode.solver)
+            .join(SolverNode.puzzle_state)
+            .options(contains_eager(SolverNode.solver), contains_eager(SolverNode.puzzle_state))
+            .where(Solver.puzzle_title == self.title, Solver.puzzle_version == self.version)
+        )
+        main_node = (
+            await self.session.execute(
+                all_nodes_query.where(
+                    SolverNode.num_placements == 0 if self.node_id == 0 else SolverNode.id == self.node_id
+                )
+            )
+        ).scalar_one()
+        potential_children = (
+            (
+                await self.session.execute(
+                    all_nodes_query.where(SolverNode.num_placements == main_node.num_placements + 1)
+                )
+            )
+            .scalars()
+            .all()
+        )
+        solutions = (
+            (await self.session.execute(all_nodes_query.where(SolverNode.status == SolverNodeStatus.WON)))
+            .scalars()
+            .all()
+        )
+        solutions_placements = frozenset(self._to_set(node) for node in solutions)
+        main_node_placements = self._to_set(main_node)
+
+        def base_tuple(node: SolverNode, placemnents: frozenset[Placement]):
+            has_solution = node.status == SolverNodeStatus.WON or any(
+                placemnents < solution_placements for solution_placements in solutions_placements
+            )
+            return node.id, node.status, has_solution
+
+        children = []
+        for child in potential_children:
+            child_placements = self._to_set(child)
+            if not (main_node_placements < child_placements):
+                continue
+            added = child_placements - main_node_placements
+            assert len(added) == 1
+            children.append(ChildExpansion(*base_tuple(child, child_placements), next(iter(added))))
+
+        return NodeExpansion(*base_tuple(main_node, main_node_placements), main_node_placements, children)

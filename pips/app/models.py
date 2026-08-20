@@ -1,8 +1,19 @@
+import typing
 from typing import Annotated
 
 from pydantic import BaseModel, BeforeValidator, Field, field_serializer
 
-from pips.model import Board, Constraint, ConstraintType, Domino, Location, LocationSet, Orientation
+from pips.model import (
+    Board,
+    BoardStatus,
+    Constraint,
+    ConstraintType,
+    Domino,
+    Location,
+    LocationSet,
+    Orientation,
+    Placement,
+)
 
 
 class ConstraintModel(BaseModel):
@@ -39,3 +50,22 @@ class PlacementModel(BaseModel):
     @field_serializer('dir')
     def serialize_type(self, dir: Orientation, _info):
         return dir.value.name
+
+    @staticmethod
+    def from_placement(placement: Placement):
+        return PlacementModel(domino=placement.domino, loc=placement.pos.loc, dir=placement.pos.dir)
+
+
+class _SolverNodeExpansionBaseModel(BaseModel):
+    id: int
+    status: BoardStatus | typing.Literal['unvisited']
+    has_solution: bool
+
+
+class SolverNodeExpansionChildModel(_SolverNodeExpansionBaseModel):
+    placement: PlacementModel
+
+
+class SolverNodeExpansionModel(_SolverNodeExpansionBaseModel):
+    placements: list[PlacementModel]
+    children: list[SolverNodeExpansionChildModel]
