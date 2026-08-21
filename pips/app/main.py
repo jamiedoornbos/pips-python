@@ -86,7 +86,7 @@ async def get_solver_job(
 ) -> BackgroundSolveModel | None:
     shell = await _solver_shell(catalog, puzzle_name)
     solver = await shell.load()
-    if not solver.lock:
+    if not solver or not solver.lock:
         raise HTTPException(404, 'not found')
 
     return BackgroundSolveModel(

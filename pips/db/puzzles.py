@@ -92,8 +92,12 @@ def placements_to_bytes(placements: typing.Sequence[Placement]) -> bytes:
     return struct.pack(f'{len(placements)}i', *sorted(map(placement_to_int, placements)))
 
 
+def bytes_to_placement_ints(placements: bytes) -> list[int]:
+    return struct.unpack(f'{len(placements) // 4}i', placements)
+
+
 def bytes_to_placements(placements: bytes) -> list[Placement]:
-    return [int_to_placement(int_placement) for int_placement in struct.unpack(f'{len(placements) // 4}i', placements)]
+    return [int_to_placement(int_placement) for int_placement in bytes_to_placement_ints(placements)]
 
 
 def _latest_versions() -> tuple[Select, type[Puzzle]]:
